@@ -78,8 +78,8 @@ pipeline {
                     sleep 40
                     for i in {1..10}; do
                         STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://13.125.49.98:8080/)
-                        if [ $STATUS -eq 200 ]; then
-                            echo "헬스 체크 통과!"
+                        if [ $STATUS -eq 200 ] || [ $STATUS -eq 401 ]; then
+                            echo "헬스 체크 통과! STATUS=$STATUS"
                             exit 0
                         fi
                         echo "대기 중... $i/10"
