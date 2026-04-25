@@ -11,7 +11,6 @@ import java.io.Serializable;
 @Getter
 @Setter
 @Builder
-@AllArgsConstructor
 @Table(name = "member")
 public class Member implements Serializable {
 
