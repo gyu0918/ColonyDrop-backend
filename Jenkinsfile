@@ -54,8 +54,7 @@ pipeline {
                         sh '''
                             ssh -o StrictHostKeyChecking=no $GREEN_SERVER "
                                 docker pull $DOCKER_HUB_ID/$IMAGE_NAME:latest &&
-                                docker stop app || true &&
-                                docker rm app || true &&
+                                docker rm -f app || true &&
                                 docker run -d --name app -p 8080:8080 \
                                     -e DB_HOST=$DB_HOST \
                                     -e DB_NAME=$DB_NAME \
