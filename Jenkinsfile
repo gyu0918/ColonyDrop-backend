@@ -74,6 +74,8 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
+                    echo "앱 시작 대기 중..."
+                    sleep 40
                     for i in {1..10}; do
                         STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://13.125.49.98:8080/)
                         if [ $STATUS -eq 200 ]; then
