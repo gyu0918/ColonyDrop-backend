@@ -269,7 +269,7 @@ pipeline {
                     sh """
                         aws autoscaling create-auto-scaling-group \
                             --auto-scaling-group-name ${env.NEXT_ASG} \
-                            --launch-template LaunchTemplateName=$LAUNCH_TEMPLATE,Version='\$Default' \
+                            --launch-template LaunchTemplateName=$LAUNCH_TEMPLATE,Version='\$Latest' \
                             --min-size 1 \
                             --max-size 6 \
                             --desired-capacity ${currentCount} \
