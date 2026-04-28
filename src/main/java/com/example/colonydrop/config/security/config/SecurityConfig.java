@@ -1,7 +1,5 @@
 package com.example.colonydrop.config.security.config;
 
-
-//import com.app.medibear.config.security.handler.OAuth2SuccessHandler;
 import com.example.colonydrop.config.security.jwt.CustomAuthenticationFailureHandler;
 import com.example.colonydrop.config.security.jwt.JwtAuthenticationEntryPoint;
 import com.example.colonydrop.config.security.jwt.JwtAuthenticationFilter;
