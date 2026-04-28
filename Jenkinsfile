@@ -262,7 +262,20 @@ pipeline {
                             --auto-scaling-group-name ${env.NEXT_ASG} \
                             --force-delete \
                             --region $REGION || true
-                        sleep 30
+                        # ASG 완전 삭제될 때까지 대기
+                        for i in \$(seq 1 20); do
+                            EXISTS=\$(aws autoscaling describe-auto-scaling-groups \
+                                --auto-scaling-group-names ${env.NEXT_ASG} \
+                                --region $REGION \
+                                --query 'length(AutoScalingGroups)' \
+                                --output text)
+                            if [ "\$EXISTS" = "0" ]; then
+                                echo "ASG 삭제 완료!"
+                                break
+                            fi
+                            echo "ASG 삭제 대기 중... \$i/20"
+                            sleep 15
+                        done
                     """
 
                     // 새 ASG 생성
