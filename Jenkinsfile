@@ -263,7 +263,7 @@ pipeline {
                             --force-delete \
                             --region $REGION || true
                         # ASG 완전 삭제될 때까지 대기
-                        for i in \$(seq 1 20); do
+                        for i in \$(seq 1 40); do
                             EXISTS=\$(aws autoscaling describe-auto-scaling-groups \
                                 --auto-scaling-group-names ${env.NEXT_ASG} \
                                 --region $REGION \
