@@ -301,25 +301,42 @@ pipeline {
                 script {
                     echo "${env.NEXT} 서버 헬스 체크 중..."
                     def healthy = false
+                    sleep 90
                     for (int i = 0; i < 20; i++) {
-                        sleep 90
-                        def healthyCount = sh(
+                        def instanceId = sh(
                             script: """
-                                aws elbv2 describe-target-health \
-                                    --target-group-arn ${env.NEXT_TG_ARN} \
+                                aws autoscaling describe-auto-scaling-groups \
+                                    --auto-scaling-group-names ${env.NEXT_ASG} \
                                     --region $REGION \
-                                    --query 'length(TargetHealthDescriptions[?TargetHealth.State==`healthy`])' \
+                                    --query 'AutoScalingGroups[0].Instances[0].InstanceId' \
                                     --output text
                             """,
                             returnStdout: true
-                        ).trim().toInteger()
+                        ).trim()
 
-                        echo "${i+1}/20 시도 - 헬시 서버: ${healthyCount}대"
+                        def ip = sh(
+                            script: """
+                                aws ec2 describe-instances \
+                                    --instance-ids ${instanceId} \
+                                    --region $REGION \
+                                    --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+                                    --output text
+                            """,
+                            returnStdout: true
+                        ).trim()
 
-                        if (healthyCount > 0) {
+                        def status = sh(
+                            script: "curl -s -o /dev/null -w '%{http_code}' http://${ip}:8080/ || echo '000'",
+                            returnStdout: true
+                        ).trim()
+
+                        echo "${i+1}/20 시도 - 응답 코드: ${status} (IP: ${ip})"
+
+                        if (status == '200' || status == '401') {
                             healthy = true
                             break
                         }
+                        sleep 30
                     }
 
                     if (!healthy) {
