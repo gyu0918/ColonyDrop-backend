@@ -289,7 +289,7 @@ pipeline {
                             --target-group-arns ${env.NEXT_TG_ARN} \
                             --vpc-zone-identifier 'subnet-0b844475ca17a4a16,subnet-0ed4476c534e85a13' \
                             --health-check-type ELB \
-                            --health-check-grace-period 300 \
+                            --health-check-grace-period 60 \
                             --region $REGION
                     """
                 }
@@ -302,7 +302,7 @@ pipeline {
                     echo "${env.NEXT} 서버 헬스 체크 중..."
                     def healthy = false
                     for (int i = 0; i < 20; i++) {
-                        sleep 30
+                        sleep 90
                         def healthyCount = sh(
                             script: """
                                 aws elbv2 describe-target-health \
