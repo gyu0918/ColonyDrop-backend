@@ -62,3 +62,7 @@ jwt:
   secret: ${JWT_SECRET}
   expiration-time: ${JWT_EXPIRATION}
   header: Authorization
+
+iamport:
+  api-key: ${IAMPORT_API_KEY}
+  api-secret: ${IAMPORT_API_SECRET}
