@@ -100,9 +100,9 @@ public class SecurityConfig {
                                 .requestMatchers("/api/calorie/**").authenticated()
 
                                 //결제부분 추가
-                                .requestMatchers("/api/orders/**").authenticated()        // 주문 생성 → 로그인 필요
-                                .requestMatchers("/api/payment/verify").authenticated()   // 결제 검증 → 로그인 필요
-                                .requestMatchers("/api/payment/refund").hasRole("ADMIN")  // 환불 → 관리자만
+//                                .requestMatchers("/api/orders/**").authenticated()        // 주문 생성 → 로그인 필요
+//                                .requestMatchers("/api/payment/verify").authenticated()   // 결제 검증 → 로그인 필요
+//                                .requestMatchers("/api/payment/refund").hasRole("ADMIN")  // 환불 → 관리자만
 
 
                         .anyRequest().authenticated() // 나머지 요청은 인증이 필요

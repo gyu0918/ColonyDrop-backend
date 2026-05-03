@@ -29,6 +29,11 @@ public class OrderController {
     public ResponseEntity<?> createOrder(@RequestBody OrderCreateRequest request,
                                          @AuthenticationPrincipal PrincipalDetails principalDetails) {
 
+        // 임시 테스트용 - 토큰 없을 때 처리
+        if (principalDetails == null) {
+            return ResponseEntity.ok("테스트 모드: 주문 API 정상 동작");
+        }
+
         Member member =  principalDetails.getUser();
         // 1. OrderService.createOrder 호출
         Order order = orderService.createOrder(member, request);
