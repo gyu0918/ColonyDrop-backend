@@ -88,6 +88,10 @@ public class SecurityConfig {
 //                                .requestMatchers("/manager/**").hasAnyRole("MANAGER", "ADMIN")  // 여러 권한중 하나만 있어도 허용
 //                                .requestMatchers("/admin/**").hasRole("ADMIN")  //  특정 하나의 권한만 허용
 //                                .requestMatchers("/api/calorie/analyze").permitAll()
+
+                                //결제 테스트를 위해 임시로 허용
+                                .requestMatchers("/api/orders/**", "/api/payment/**").permitAll()
+
                                 .requestMatchers("/api/auth/refresh", "/css/**", "/js/**", "/images/**",
                                         "/join", "/api/join", "/api/non-member/**","/static/**",
                                         "/api/checkId","/api/signUp","/api/getProfileImg","/img/**","/rec/**",
@@ -99,7 +103,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/orders/**").authenticated()        // 주문 생성 → 로그인 필요
                                 .requestMatchers("/api/payment/verify").authenticated()   // 결제 검증 → 로그인 필요
                                 .requestMatchers("/api/payment/refund").hasRole("ADMIN")  // 환불 → 관리자만
-                                .requestMatchers("/api/orders/**", "/api/payment/**").permitAll()
+
 
                         .anyRequest().authenticated() // 나머지 요청은 인증이 필요
 //                                .anyRequest().permitAll()
