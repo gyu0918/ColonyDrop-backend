@@ -1,6 +1,5 @@
 package com.example.colonydrop.service.payment;
 
-import com.example.colonydrop.config.IamportConfig;
 import com.example.colonydrop.dto.payment.PaymentRefundRequest;
 import com.example.colonydrop.dto.payment.PaymentVerifyRequest;
 import com.example.colonydrop.entity.order.Order;
@@ -32,9 +31,14 @@ public class PaymentService {
                 .paymentByImpUid(paymentVerifyRequest.getImpUid())
                 .getResponse();
 
+        //null 처리
+        if(payment == null){
+            throw new IllegalArgumentException("결제 정보가 존재하지 않습니다.");
+        }
+
         // 2. DB에서 주문 조회 (merchantUid로)
-        Order order = orderRepository.findByImpUid(paymentVerifyRequest
-                .getImpUid()).orElseThrow(()-> new IllegalArgumentException("주문을 찾을수 없습니다."));
+        Order order = orderRepository.findByMerchantUid(paymentVerifyRequest
+                .getMerchantUid()).orElseThrow(()-> new IllegalArgumentException("주문을 찾을수 없습니다."));
 
         // 3. 이미 처리된 주문인지 확인 (PENDING 상태인지)
         if (!"PENDING".equals(order.getStatus())) {
@@ -56,7 +60,7 @@ public class PaymentService {
 
 
         // 5. 결제 상태 확인 (paid 인지)
-        if (!"PAID".equals(payment.getStatus())) {
+        if (!"paid".equals(payment.getStatus())) {
             throw new IllegalArgumentException("결제 실패!!");
         }
 
@@ -65,7 +69,7 @@ public class PaymentService {
         order.setStatus("PAID");
         order.setPaidAt(LocalDateTime.now());
         // 7. 상품 상태 SOLD로 변경
-        order.getItem().setStatus("SOLID");
+        order.getItem().setStatus("SOLD");
 
         orderRepository.save(order);
 
@@ -77,7 +81,7 @@ public class PaymentService {
     public void refundPayment(PaymentRefundRequest paymentRefundRequest) throws Exception {
 
         // 1. 주문 조회 (merchantUid로)
-        Order order = orderRepository.findByImpUid(paymentRefundRequest.getMerchantUid())
+        Order order = orderRepository.findByMerchantUid(paymentRefundRequest.getMerchantUid())
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을수 없습니다."));
 
         // 2. PAID 상태인지 확인

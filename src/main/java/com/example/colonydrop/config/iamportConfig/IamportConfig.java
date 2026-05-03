@@ -1,4 +1,4 @@
-package com.example.colonydrop.config;
+package com.example.colonydrop.config.iamportConfig;
 
 import com.siot.IamportRestClient.IamportClient;
 import org.springframework.beans.factory.annotation.Value;
