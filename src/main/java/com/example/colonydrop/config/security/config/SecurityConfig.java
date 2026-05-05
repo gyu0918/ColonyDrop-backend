@@ -6,6 +6,7 @@ import com.example.colonydrop.config.security.jwt.JwtAuthenticationEntryPoint;
 import com.example.colonydrop.config.security.jwt.JwtAuthenticationFilter;
 import com.example.colonydrop.config.security.jwt.JwtAuthorizationFilter;
 import com.example.colonydrop.config.security.oauth2.CustomOAuth2UserService;
+import com.example.colonydrop.config.security.oauth2.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.example.colonydrop.config.security.oauth2.JwtProperties;
 
 import com.example.colonydrop.repository.member.MemberRepository;
@@ -36,7 +37,8 @@ public class SecurityConfig {
     private final JwtProperties jwtProperties;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final CustomAuthenticationFailureHandler customAuthenticationFailureHandler;
-
+    //소셜 로그인 1대서버일경우 문제 없는데 서버2대이상일경우 세션 문제 생겨서 추가함
+    private final HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
     //redis
     private final StringRedisTemplate stringRedisTemplate;
@@ -111,14 +113,22 @@ public class SecurityConfig {
                         .anyRequest().authenticated() // 나머지 요청은 인증이 필요
 //                                .anyRequest().permitAll()
                 )
+//                .oauth2Login(oauth2 -> oauth2
+//                                .userInfoEndpoint(userInfo -> userInfo
+//                                        .userService(customOAuth2UserService())
+//                                )
+//                                .successHandler(oAuth2SuccessHandler()));
+                // oauth2Login 수정
                 .oauth2Login(oauth2 -> oauth2
-                                .userInfoEndpoint(userInfo -> userInfo
-                                        .userService(customOAuth2UserService())
-                                )
-                                .successHandler(oAuth2SuccessHandler()));
+                        .authorizationEndpoint(auth -> auth
+                                .authorizationRequestRepository(cookieAuthorizationRequestRepository) // ✅ 추가
+                        )
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService())
+                        )
+                        .successHandler(oAuth2SuccessHandler())
+                );
 ////                        .defaultSuccessUrl("http://localhost:3000/", true) // 로그인 성공 후 이동할 페이지
-
-//                );
         return http.build();
     }
 
