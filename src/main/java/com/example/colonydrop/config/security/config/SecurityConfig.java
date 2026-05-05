@@ -40,6 +40,10 @@ public class SecurityConfig {
     //소셜 로그인 1대서버일경우 문제 없는데 서버2대이상일경우 세션 문제 생겨서 추가함
     private final HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
+    // ✅ 수정 - new 대신 주입받기
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+
     //redis
     private final StringRedisTemplate stringRedisTemplate;
     //Spring Boot 3.x 이상에서는 AuthenticationManager를 직접 빌드해서 넣어줘야 필터에서 사용할 수 있음.
@@ -54,15 +58,15 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    @Bean     //소셜 로그인쪽
-    public CustomOAuth2UserService customOAuth2UserService() {
-        return new CustomOAuth2UserService(memberRepository);
-    }
-
-    @Bean   //  소셜 로그인 부분
-    public OAuth2SuccessHandler oAuth2SuccessHandler() {
-        return new OAuth2SuccessHandler(jwtProperties, stringRedisTemplate);
-    }
+//    @Bean     //소셜 로그인쪽
+//    public CustomOAuth2UserService customOAuth2UserService() {
+//        return new CustomOAuth2UserService(memberRepository);
+//    }
+//
+//    @Bean   //  소셜 로그인 부분
+//    public OAuth2SuccessHandler oAuth2SuccessHandler() {
+//        return new OAuth2SuccessHandler(jwtProperties, stringRedisTemplate);
+//    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
@@ -113,11 +117,11 @@ public class SecurityConfig {
                         .anyRequest().authenticated() // 나머지 요청은 인증이 필요
 //                                .anyRequest().permitAll()
                 )
-                .oauth2Login(oauth2 -> oauth2
-                                .userInfoEndpoint(userInfo -> userInfo
-                                        .userService(customOAuth2UserService())
-                                )
-                                .successHandler(oAuth2SuccessHandler()));
+//                .oauth2Login(oauth2 -> oauth2
+//                                .userInfoEndpoint(userInfo -> userInfo
+//                                        .userService(customOAuth2UserService())
+//                                )
+//                                .successHandler(oAuth2SuccessHandler()));
                 // oauth2Login 수정
 //                .oauth2Login(oauth2 -> oauth2
 //                        .authorizationEndpoint(auth -> auth
@@ -128,7 +132,16 @@ public class SecurityConfig {
 //                        )
 //                        .successHandler(oAuth2SuccessHandler())
 //                );
-////                        .defaultSuccessUrl("http://localhost:3000/", true) // 로그인 성공 후 이동할 페이지
+                // ✅ 수정 - Redis 저장소 방식 + 주입받은 Bean 사용
+                .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(auth -> auth
+                                .authorizationRequestRepository(cookieAuthorizationRequestRepository)
+                        )
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService) // ✅ 주입받은 것 사용
+                        )
+                        .successHandler(oAuth2SuccessHandler) // ✅ 주입받은 것 사용
+                );
         return http.build();
     }
 
