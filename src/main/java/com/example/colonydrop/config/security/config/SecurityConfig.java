@@ -76,7 +76,7 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))   //react랑 연결용 cors허용
                 .csrf(AbstractHttpConfigurer::disable)  //jwt방식은 세션 없기 때문에 불필요 해서 처리함
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) //서버가 로그인 세션을 유지하지 않음 그래서 왜냐 토큰 방식이니까!!  그래서 stateless처리 해준다.
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)) //서버가 로그인 세션을 유지하지 않음 그래서 왜냐 토큰 방식이니까!!  그래서 stateless처리 해준다.
                 .addFilter(jwtAuthenticationFilter)  // 이부분이 처음 로그인할때만 동작한다.
 //                .addFilter(new JwtAuthorizationFilter(authenticationManager, memberRepository , jwtProperties))
                 .addFilter(new JwtAuthorizationFilter(authenticationManager, memberRepository, jwtProperties, stringRedisTemplate))
