@@ -213,7 +213,7 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
 
 
         if (authorizationRequest == null) return;
-        
+
         System.out.println("✅ saveAuthorizationRequest 호출! state = " + authorizationRequest.getState());
 
 

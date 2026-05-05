@@ -113,21 +113,21 @@ public class SecurityConfig {
                         .anyRequest().authenticated() // 나머지 요청은 인증이 필요
 //                                .anyRequest().permitAll()
                 )
-//                .oauth2Login(oauth2 -> oauth2
-//                                .userInfoEndpoint(userInfo -> userInfo
-//                                        .userService(customOAuth2UserService())
-//                                )
-//                                .successHandler(oAuth2SuccessHandler()));
-                // oauth2Login 수정
                 .oauth2Login(oauth2 -> oauth2
-                        .authorizationEndpoint(auth -> auth
-                                .authorizationRequestRepository(cookieAuthorizationRequestRepository) // ✅ 추가
-                        )
-                        .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService())
-                        )
-                        .successHandler(oAuth2SuccessHandler())
-                );
+                                .userInfoEndpoint(userInfo -> userInfo
+                                        .userService(customOAuth2UserService())
+                                )
+                                .successHandler(oAuth2SuccessHandler()));
+                // oauth2Login 수정
+//                .oauth2Login(oauth2 -> oauth2
+//                        .authorizationEndpoint(auth -> auth
+//                                .authorizationRequestRepository(cookieAuthorizationRequestRepository) // ✅ 추가
+//                        )
+//                        .userInfoEndpoint(userInfo -> userInfo
+//                                .userService(customOAuth2UserService())
+//                        )
+//                        .successHandler(oAuth2SuccessHandler())
+//                );
 ////                        .defaultSuccessUrl("http://localhost:3000/", true) // 로그인 성공 후 이동할 페이지
         return http.build();
     }
@@ -147,6 +147,7 @@ public class SecurityConfig {
         // ✅ 운영 도메인 추가 필요
         configuration.addAllowedOrigin("https://colonydrop0079.com");
         configuration.addAllowedOrigin("https://www.colonydrop0079.com");
+        configuration.addAllowedOrigin("https://api.colonydrop0079.com");
 
         // 클라이언트에서 읽을 수 있도록 Authorization 헤더 노출 추가
         configuration.addExposedHeader("Authorization");
