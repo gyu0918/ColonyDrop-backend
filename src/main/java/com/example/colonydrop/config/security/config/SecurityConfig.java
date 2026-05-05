@@ -134,9 +134,9 @@ public class SecurityConfig {
 //                );
                 // ✅ 수정 - Redis 저장소 방식 + 주입받은 Bean 사용
                 .oauth2Login(oauth2 -> oauth2
-                        .authorizationEndpoint(auth -> auth
-                                .authorizationRequestRepository(cookieAuthorizationRequestRepository)
-                        )
+//                        .authorizationEndpoint(auth -> auth
+//                                .authorizationRequestRepository(cookieAuthorizationRequestRepository)
+//                        )
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService) // ✅ 주입받은 것 사용
                         )
