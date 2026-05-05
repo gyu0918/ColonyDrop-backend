@@ -210,7 +210,12 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
     public void saveAuthorizationRequest(OAuth2AuthorizationRequest authorizationRequest,
                                          HttpServletRequest request,
                                          HttpServletResponse response) {
+
+
         if (authorizationRequest == null) return;
+        
+        System.out.println("✅ saveAuthorizationRequest 호출! state = " + authorizationRequest.getState());
+
 
         String state = authorizationRequest.getState();
         stringRedisTemplate.opsForValue().set(
@@ -224,8 +229,13 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
     @Override
     public OAuth2AuthorizationRequest removeAuthorizationRequest(
             HttpServletRequest request, HttpServletResponse response) {
+
         OAuth2AuthorizationRequest authRequest = loadAuthorizationRequest(request);
         String state = request.getParameter("state");
+        System.out.println("✅ loadAuthorizationRequest 호출! state = " + state);
+        String value = stringRedisTemplate.opsForValue().get(PREFIX + state);
+        System.out.println("✅ Redis에서 찾은 값 = " + value);
+
         if (state != null) {
             stringRedisTemplate.delete(PREFIX + state);
         }
