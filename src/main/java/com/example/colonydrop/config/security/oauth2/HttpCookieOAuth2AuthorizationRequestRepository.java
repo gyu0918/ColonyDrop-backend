@@ -89,7 +89,7 @@ import org.springframework.util.SerializationUtils;
 
 import java.util.Base64;
 
-@Component
+
 public class HttpCookieOAuth2AuthorizationRequestRepository
         implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
 
