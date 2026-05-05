@@ -1,20 +1,20 @@
 package com.example.colonydrop.config.security.config;
 
+import com.example.colonydrop.config.security.handler.OAuth2SuccessHandler;
 import com.example.colonydrop.config.security.jwt.CustomAuthenticationFailureHandler;
 import com.example.colonydrop.config.security.jwt.JwtAuthenticationEntryPoint;
 import com.example.colonydrop.config.security.jwt.JwtAuthenticationFilter;
 import com.example.colonydrop.config.security.jwt.JwtAuthorizationFilter;
-//import com.app.medibear.config.security.oauth2.CustomOAuth2UserService;
+import com.example.colonydrop.config.security.oauth2.CustomOAuth2UserService;
 import com.example.colonydrop.config.security.oauth2.JwtProperties;
 
-//import com.app.medibear.utils.GetUrlToImage;
 import com.example.colonydrop.repository.member.MemberRepository;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.HttpMethod;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -35,9 +35,8 @@ public class SecurityConfig {
     private final MemberRepository memberRepository;
     private final JwtProperties jwtProperties;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    //private final StringRedisTemplate stringRedisTemplate;
     private final CustomAuthenticationFailureHandler customAuthenticationFailureHandler;
-//    private final GetUrlToImage getUrlToImage;
+
 
     //redis
     private final StringRedisTemplate stringRedisTemplate;
@@ -53,15 +52,15 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-//    @Bean     소셜 로그인쪽
-//    public CustomOAuth2UserService customOAuth2UserService() {
-//        return new CustomOAuth2UserService(memberRepository,getUrlToImage);
-//    }
+    @Bean     //소셜 로그인쪽
+    public CustomOAuth2UserService customOAuth2UserService() {
+        return new CustomOAuth2UserService(memberRepository);
+    }
 
-//    @Bean     소셜 로그인 부분
-//    public OAuth2SuccessHandler oAuth2SuccessHandler() {
-//        return new OAuth2SuccessHandler(jwtProperties, stringRedisTemplate);
-//    }
+    @Bean   //  소셜 로그인 부분
+    public OAuth2SuccessHandler oAuth2SuccessHandler() {
+        return new OAuth2SuccessHandler(jwtProperties, stringRedisTemplate);
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
@@ -77,7 +76,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)  //jwt방식은 세션 없기 때문에 불필요 해서 처리함
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) //서버가 로그인 세션을 유지하지 않음 그래서 왜냐 토큰 방식이니까!!  그래서 stateless처리 해준다.
                 .addFilter(jwtAuthenticationFilter)  // 이부분이 처음 로그인할때만 동작한다.
-                .addFilter(new JwtAuthorizationFilter(authenticationManager, memberRepository , jwtProperties))
+//                .addFilter(new JwtAuthorizationFilter(authenticationManager, memberRepository , jwtProperties))
+                .addFilter(new JwtAuthorizationFilter(authenticationManager, memberRepository, jwtProperties, stringRedisTemplate))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint) // 401 예외처리부분 로그인 실패시
                 )
@@ -99,6 +99,9 @@ public class SecurityConfig {
                                 .requestMatchers("/").permitAll() // 기본 홈 페이지도 허용
                                 .requestMatchers("/api/calorie/**").authenticated()
 
+                                // 소셜 로그인때문에
+                                .requestMatchers("/login/oauth2/**", "/oauth2/**").permitAll()
+
                                 //결제부분 추가
 //                                .requestMatchers("/api/orders/**").authenticated()        // 주문 생성 → 로그인 필요
 //                                .requestMatchers("/api/payment/verify").authenticated()   // 결제 검증 → 로그인 필요
@@ -107,12 +110,12 @@ public class SecurityConfig {
 
                         .anyRequest().authenticated() // 나머지 요청은 인증이 필요
 //                                .anyRequest().permitAll()
-                );
-//                .oauth2Login(oauth2 -> oauth2
-//                                .userInfoEndpoint(userInfo -> userInfo
-//                                        .userService(customOAuth2UserService())
-//                                )
-//                                .successHandler(oAuth2SuccessHandler())
+                )
+                .oauth2Login(oauth2 -> oauth2
+                                .userInfoEndpoint(userInfo -> userInfo
+                                        .userService(customOAuth2UserService())
+                                )
+                                .successHandler(oAuth2SuccessHandler()));
 ////                        .defaultSuccessUrl("http://localhost:3000/", true) // 로그인 성공 후 이동할 페이지
 
 //                );
@@ -130,6 +133,11 @@ public class SecurityConfig {
         configuration.addAllowedHeader("*");
         configuration.addAllowedMethod("*");
         configuration.setAllowCredentials(true);
+
+        // ✅ 운영 도메인 추가 필요
+        configuration.addAllowedOrigin("https://colonydrop0079.com");
+        configuration.addAllowedOrigin("https://www.colonydrop0079.com");
+
         // 클라이언트에서 읽을 수 있도록 Authorization 헤더 노출 추가
         configuration.addExposedHeader("Authorization");
         //refreshToken 때문에 노출해야된다.  근데 이부분은 의미 없어서 빠져도 노상관

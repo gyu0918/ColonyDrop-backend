@@ -14,6 +14,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -34,12 +35,16 @@ public class JwtAuthorizationFilter extends BasicAuthenticationFilter {
 
     private MemberRepository memberRepository;
     private final JwtProperties jwtProperties;
+    private final StringRedisTemplate stringRedisTemplate; // 블랙리스트 처리
 
-    public JwtAuthorizationFilter(AuthenticationManager authenticationManager, MemberRepository memberRepository, JwtProperties jwtProperties) {
+    public JwtAuthorizationFilter(AuthenticationManager authenticationManager, MemberRepository memberRepository
+            , JwtProperties jwtProperties,
+            StringRedisTemplate stringRedisTemplate) {
 
         super(authenticationManager);
         this.memberRepository = memberRepository;
         this.jwtProperties = jwtProperties;
+        this.stringRedisTemplate = stringRedisTemplate;
     }
 
     @Override
@@ -64,6 +69,23 @@ public class JwtAuthorizationFilter extends BasicAuthenticationFilter {
         }
 
         String jwtToken = jwtHeader.replace("Bearer ", "");
+
+        //  블랙리스트 체크 (로그아웃된 토큰 차단)
+        String blacklisted = stringRedisTemplate.opsForValue().get("BL:" + jwtToken);
+        if (blacklisted != null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            Map<String, String> result = new HashMap<>();
+            result.put("code", "LOGGED_OUT_TOKEN");
+            result.put("message", "이미 로그아웃된 토큰입니다.");
+            response.getWriter().write(new ObjectMapper().writeValueAsString(result));
+            response.getWriter().flush();
+            return;
+        }
+
+
+
+
         String memberId = null;
 
         try {
