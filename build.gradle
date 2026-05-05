@@ -76,8 +76,6 @@ dependencies {
     //redis 분산락 위해서
     implementation 'org.redisson:redisson:3.27.2'
 
-    //samesite 때문에
-    implementation 'org.springframework.session:spring-session-core'
 }
 
 generateJava {

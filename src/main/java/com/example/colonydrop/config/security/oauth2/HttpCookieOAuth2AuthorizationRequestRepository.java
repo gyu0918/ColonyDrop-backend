@@ -212,18 +212,44 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
                                          HttpServletResponse response) {
 
 
-        if (authorizationRequest == null) return;
+//        if (authorizationRequest == null) return;
+//
+//        System.out.println("✅ saveAuthorizationRequest 호출! state = " + authorizationRequest.getState());
+//
+//
+//        String state = authorizationRequest.getState();
+//        stringRedisTemplate.opsForValue().set(
+//                PREFIX + state,
+//                serialize(authorizationRequest),
+//                TTL,
+//                TimeUnit.SECONDS
+//        );
+        System.out.println("✅✅✅ saveAuthorizationRequest 호출됨!!!!");
 
-        System.out.println("✅ saveAuthorizationRequest 호출! state = " + authorizationRequest.getState());
+        if (authorizationRequest == null) {
+            System.out.println("❌ authorizationRequest null!");
+            return;
+        }
 
+        try {
+            String state = authorizationRequest.getState();
+            System.out.println("✅ state = " + state);
 
-        String state = authorizationRequest.getState();
-        stringRedisTemplate.opsForValue().set(
-                PREFIX + state,
-                serialize(authorizationRequest),
-                TTL,
-                TimeUnit.SECONDS
-        );
+            String serialized = serialize(authorizationRequest);
+            System.out.println("✅ 직렬화 성공! length = " + serialized.length());
+
+            stringRedisTemplate.opsForValue().set(
+                    PREFIX + state,
+                    serialized,
+                    TTL,
+                    TimeUnit.SECONDS
+            );
+            System.out.println("✅ Redis 저장 완료!");
+
+        } catch (Exception e) {
+            System.out.println("❌ 에러 발생: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     @Override

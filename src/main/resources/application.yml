@@ -60,11 +60,6 @@ spring:
 
 server:
   forward-headers-strategy: native
-  servlet:
-    session:
-      cookie:
-        same-site: none
-        secure: true
 
 jwt:
   secret: ${JWT_SECRET}
