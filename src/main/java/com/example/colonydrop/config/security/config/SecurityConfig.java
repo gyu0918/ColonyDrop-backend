@@ -38,7 +38,7 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final CustomAuthenticationFailureHandler customAuthenticationFailureHandler;
     //소셜 로그인 1대서버일경우 문제 없는데 서버2대이상일경우 세션 문제 생겨서 추가함
-    private final HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
+//    private final HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
     //redis
     private final StringRedisTemplate stringRedisTemplate;
