@@ -76,6 +76,9 @@ dependencies {
     //redis 분산락 위해서
     implementation 'org.redisson:redisson:3.27.2'
 
+    //oauth2 sameSite 처리를 위해서
+    implementation 'org.springframework.session:spring-session-data-redis'
+
 }
 
 generateJava {
