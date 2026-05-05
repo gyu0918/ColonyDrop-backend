@@ -186,7 +186,7 @@ import org.springframework.util.SerializationUtils;
 import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 
-@Component
+//@Component
 @RequiredArgsConstructor
 public class HttpCookieOAuth2AuthorizationRequestRepository
         implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
