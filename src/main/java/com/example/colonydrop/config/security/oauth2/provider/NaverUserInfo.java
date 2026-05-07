@@ -25,13 +25,28 @@ public class NaverUserInfo implements OAuth2UserInfo {
         return (String) attributes.get("email");
     }
 
+//    @Override
+//    public String getName() {
+//        return (String) attributes.get("name");
+//    }
+//
+//    @Override
+//    public String getProfile_image() {
+//        return "";
+//    }
+
     @Override
     public String getName() {
-        return (String) attributes.get("name");
+        // 네이버도 nickname으로 오는 경우 있음, null 체크 추가
+        Object name = attributes.get("nickname");
+        if (name != null) return name.toString();
+        Object nameAttr = attributes.get("name");
+        return nameAttr != null ? nameAttr.toString() : null;
     }
 
     @Override
     public String getProfile_image() {
-        return "";
+        Object img = attributes.get("profile_image");
+        return img != null ? img.toString() : null;
     }
 }
