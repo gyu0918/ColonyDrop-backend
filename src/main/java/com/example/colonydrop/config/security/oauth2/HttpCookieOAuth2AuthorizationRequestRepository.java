@@ -90,6 +90,8 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
                 return (OAuth2AuthorizationRequest) ois.readObject();
             }
         } catch (Exception e) {
+            System.out.println("❌❌❌ 역직렬화 실패: " + e.getMessage());
+            e.printStackTrace(); // ← 이게 핵심
             return null;
         }
     }
