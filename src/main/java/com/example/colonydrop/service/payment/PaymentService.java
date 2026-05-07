@@ -8,6 +8,7 @@ import com.siot.IamportRestClient.IamportClient;
 import com.siot.IamportRestClient.request.CancelData;
 import com.siot.IamportRestClient.response.Payment;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PaymentService {
     // 필요한 것들 주입 (IamportClient, OrderRepository)
@@ -123,5 +125,52 @@ public class PaymentService {
         orderRepository.save(order);
 
     }
+
+    //웹훅 처리
+    @Transactional
+    public void processWebhook(String impUid, String merchantUid, String status) throws Exception {
+
+        // 1. 주문 조회
+        Order order = orderRepository.findByMerchantUid(merchantUid)
+                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
+
+        // 2. 이미 처리된 주문이면 무시 (웹훅 중복 방지)
+        if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
+            log.info("이미 처리된 주문 웹훅 무시: {}", merchantUid);
+            return;
+        }
+
+        // 3. paid 상태일 때만 검증 진행
+        if (!"paid".equals(status)) {
+            log.info("결제 미완료 웹훅 무시: {}, status: {}", merchantUid, status);
+            return;
+        }
+
+        // 4. 포트원 API로 실제 결제 정보 조회
+        Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
+
+        if (payment == null) {
+            throw new IllegalArgumentException("포트원에서 결제 정보를 찾을 수 없습니다.");
+        }
+
+        // 5. 금액 검증
+        if (payment.getAmount().compareTo(order.getTotalPrice()) != 0) {
+            // 금액 불일치 → 즉시 취소
+            CancelData cancelData = new CancelData(impUid, true);
+            cancelData.setReason("금액 위변조 감지 (웹훅)");
+            iamportClient.cancelPaymentByImpUid(cancelData);
+            throw new IllegalStateException("결제 금액 불일치 - 자동 취소됨");
+        }
+
+        // 6. 주문 상태 업데이트
+        order.setImpUid(impUid);
+        order.setStatus("PAID");
+        order.setPaidAt(LocalDateTime.now());
+        order.getItem().setStatus("SOLD");
+
+        orderRepository.save(order);
+        log.info("웹훅으로 결제 완료 처리: {}", merchantUid);
+    }
+
 
 }

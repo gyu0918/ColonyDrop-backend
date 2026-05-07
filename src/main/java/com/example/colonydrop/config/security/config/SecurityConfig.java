@@ -113,6 +113,8 @@ public class SecurityConfig {
 //                                .requestMatchers("/api/payment/verify").authenticated()   // 결제 검증 → 로그인 필요
 //                                .requestMatchers("/api/payment/refund").hasRole("ADMIN")  // 환불 → 관리자만
 
+                                //webhook 처리
+                                .requestMatchers("/api/payment/webhook").permitAll() // ← 추가
 
                         .anyRequest().authenticated() // 나머지 요청은 인증이 필요
 //                                .anyRequest().permitAll()

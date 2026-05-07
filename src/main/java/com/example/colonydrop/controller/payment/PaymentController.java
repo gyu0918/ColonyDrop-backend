@@ -5,12 +5,16 @@ import com.example.colonydrop.dto.payment.PaymentRefundRequest;
 import com.example.colonydrop.dto.payment.PaymentVerifyRequest;
 import com.example.colonydrop.service.payment.PaymentService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/payment")
@@ -50,6 +54,26 @@ public class PaymentController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
 
+    }
+
+    // POST /api/payment/webhook
+    @PostMapping("/webhook")
+    public ResponseEntity<?> webhook(@RequestBody Map<String, String> payload) {
+        try {
+            String impUid = payload.get("imp_uid");
+            String merchantUid = payload.get("merchant_uid");
+            String status = payload.get("status");
+
+            log.info("웹훅 수신 - impUid: {}, merchantUid: {}, status: {}",
+                    impUid, merchantUid, status);
+
+            paymentService.processWebhook(impUid, merchantUid, status);
+            return ResponseEntity.ok("OK");
+        } catch (Exception e) {
+            log.error("웹훅 처리 실패: {}", e.getMessage());
+            // 포트원은 OK가 아니면 재시도함 → 500 반환
+            return ResponseEntity.internalServerError().body(e.getMessage());
+        }
     }
 
 }
