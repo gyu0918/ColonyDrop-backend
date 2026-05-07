@@ -4,6 +4,7 @@ package com.example.colonydrop.config.security.auth;
 
 import com.example.colonydrop.entity.member.Member;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
@@ -29,13 +30,16 @@ public class PrincipalDetails implements UserDetails, OAuth2User {
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         Collection<GrantedAuthority> authorities = new ArrayList<>();
-//        if (member.getRoleList() != null) {
-//            member.getRoleList().forEach(role -> authorities.add(() -> role));
-//        }
-
-        //밑에 줄 인가 부분없는거 떄문에 이렇게 처리했다 우선 override를 해서 필수 메서드는 모두 구현해야되는거 때문에 만약에 인가부분이 생기면 그떄 이거 지우고 위에 주석제거
-        authorities = null;
-        return authorities;
+////        if (member.getRoleList() != null) {
+////            member.getRoleList().forEach(role -> authorities.add(() -> role));
+////        }
+//
+//        //밑에 줄 인가 부분없는거 떄문에 이렇게 처리했다 우선 override를 해서 필수 메서드는 모두 구현해야되는거 때문에 만약에 인가부분이 생기면 그떄 이거 지우고 위에 주석제거
+//        authorities = null;
+        if (member.getRoles() != null) {
+            authorities.add(new SimpleGrantedAuthority(member.getRoles()));
+        }
+        return authorities;  // null 대신 빈 컬렉션 또는 권한 목록 반환
     }
 
     // 비밀번호
