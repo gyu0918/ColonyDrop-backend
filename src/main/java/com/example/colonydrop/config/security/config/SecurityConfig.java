@@ -133,14 +133,27 @@ public class SecurityConfig {
 //                        .successHandler(oAuth2SuccessHandler())
 //                );
                 // ✅ 수정 - Redis 저장소 방식 + 주입받은 Bean 사용
+//                .oauth2Login(oauth2 -> oauth2
+//                        .authorizationEndpoint(auth -> auth
+//                                .authorizationRequestRepository(cookieAuthorizationRequestRepository)
+//                        )
+//                        .userInfoEndpoint(userInfo -> userInfo
+//                                .userService(customOAuth2UserService) // ✅ 주입받은 것 사용
+//                        )
+//                        .successHandler(oAuth2SuccessHandler) // ✅ 주입받은 것 사용
+//                );
                 .oauth2Login(oauth2 -> oauth2
-                        .authorizationEndpoint(auth -> auth
+                        .authorizationEndpoint(endpoint -> endpoint
+                                .baseUri("/oauth2/authorization")
                                 .authorizationRequestRepository(cookieAuthorizationRequestRepository)
                         )
-                        .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService) // ✅ 주입받은 것 사용
+                        .redirectionEndpoint(endpoint -> endpoint
+                                .baseUri("/login/oauth2/code/*")
                         )
-                        .successHandler(oAuth2SuccessHandler) // ✅ 주입받은 것 사용
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService)
+                        )
+                        .successHandler(oAuth2SuccessHandler)
                 );
         return http.build();
     }

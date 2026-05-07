@@ -34,6 +34,11 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
     public void saveAuthorizationRequest(OAuth2AuthorizationRequest authorizationRequest,
                                          HttpServletRequest request,
                                          HttpServletResponse response) {
+        System.out.println("🔥🔥🔥 saveAuthorizationRequest 호출됨! state="
+                + (authorizationRequest != null ? authorizationRequest.getState() : "NULL"));
+
+
+
         if (authorizationRequest == null) {
             deleteCookie(response);
             return;
