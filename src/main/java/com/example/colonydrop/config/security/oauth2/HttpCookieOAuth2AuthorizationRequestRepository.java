@@ -6,11 +6,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.util.SerializationUtils;
 
+import java.io.*;
 import java.util.Base64;
 
-@Component  // ← 이게 핵심, 이전 버전에서 빠져있었음
+@Component
 public class HttpCookieOAuth2AuthorizationRequestRepository
         implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
 
@@ -39,7 +39,6 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
             return;
         }
 
-        // SameSite=None + Secure → 카카오 콜백(cross-site)에서도 쿠키 전송됨
         String cookieValue = serialize(authorizationRequest);
         String cookie = COOKIE_NAME + "=" + cookieValue
                 + "; Path=/"
@@ -68,13 +67,25 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
         response.addHeader("Set-Cookie", expiredCookie);
     }
 
+    // SerializationUtils 제거 → 표준 Java 직렬화로 교체 (Spring Boot 4.x 호환)
     private String serialize(OAuth2AuthorizationRequest authorizationRequest) {
-        return Base64.getUrlEncoder().encodeToString(
-                SerializationUtils.serialize(authorizationRequest));
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+            oos.writeObject(authorizationRequest);
+            return Base64.getUrlEncoder().encodeToString(baos.toByteArray());
+        } catch (IOException e) {
+            throw new RuntimeException("OAuth2 직렬화 실패", e);
+        }
     }
 
-    private OAuth2AuthorizationRequest deserialize(String cookie) {
-        return (OAuth2AuthorizationRequest) SerializationUtils.deserialize(
-                Base64.getUrlDecoder().decode(cookie));
+    private OAuth2AuthorizationRequest deserialize(String value) {
+        try {
+            byte[] bytes = Base64.getUrlDecoder().decode(value);
+            try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+                return (OAuth2AuthorizationRequest) ois.readObject();
+            }
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
