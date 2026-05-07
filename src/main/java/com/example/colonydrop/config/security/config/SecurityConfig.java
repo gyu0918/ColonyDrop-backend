@@ -38,7 +38,7 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final CustomAuthenticationFailureHandler customAuthenticationFailureHandler;
     //소셜 로그인 1대서버일경우 문제 없는데 서버2대이상일경우 세션 문제 생겨서 추가함
-//    private final HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
+    private final HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
     // ✅ 수정 - new 대신 주입받기
     private final CustomOAuth2UserService customOAuth2UserService;
@@ -134,9 +134,9 @@ public class SecurityConfig {
 //                );
                 // ✅ 수정 - Redis 저장소 방식 + 주입받은 Bean 사용
                 .oauth2Login(oauth2 -> oauth2
-//                        .authorizationEndpoint(auth -> auth
-//                                .authorizationRequestRepository(cookieAuthorizationRequestRepository)
-//                        )
+                        .authorizationEndpoint(auth -> auth
+                                .authorizationRequestRepository(cookieAuthorizationRequestRepository)
+                        )
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService) // ✅ 주입받은 것 사용
                         )
