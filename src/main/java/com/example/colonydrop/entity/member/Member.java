@@ -37,7 +37,7 @@ public class Member implements Serializable {
     @Column(name = "roles", length = 15, nullable = false)
     private String roles;
 
-    @Column(name = "img_url", length = 70)
+    @Column(name = "img_url", length = 500)
     private String imgUrl;
 
     public Member(Long id, String memberId, String memberPw, String memberName, String provider, String providerId, String roles, String imgUrl) {
