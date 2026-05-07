@@ -19,19 +19,19 @@ public class Member implements Serializable {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "member_id", length = 20, unique = true, nullable = false)
+    @Column(name = "member_id", length = 100, unique = true, nullable = false)
     private String memberId;        // 로그인 식별자 (중복 불가)
 
     @Column(name = "member_pw", length = 256)
     private String memberPw;
 
-    @Column(name = "member_name", length = 20)
+    @Column(name = "member_name", length = 100)
     private String memberName;      // ← 다시 추가
 
     @Column(name = "provider", length = 10)
     private String provider;
 
-    @Column(name = "provider_id", length = 30)
+    @Column(name = "provider_id", length = 100)
     private String providerId;
 
     @Column(name = "roles", length = 15, nullable = false)
