@@ -108,6 +108,8 @@ public class SecurityConfig {
                                 // 소셜 로그인때문에
                                 .requestMatchers("/login/oauth2/**", "/oauth2/**").permitAll()
 
+                                //물품조회떄문에
+                                .requestMatchers("/api/products/**").permitAll()
                                 //결제부분 추가
 //                                .requestMatchers("/api/orders/**").authenticated()        // 주문 생성 → 로그인 필요
 //                                .requestMatchers("/api/payment/verify").authenticated()   // 결제 검증 → 로그인 필요
