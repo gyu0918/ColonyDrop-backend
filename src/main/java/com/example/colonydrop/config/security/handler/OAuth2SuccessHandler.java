@@ -97,13 +97,20 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         response.addHeader("Set-Cookie", cookie.toString());
 
         // **팝업에서 부모창에 메시지 보내고 팝업 닫기 스크립트**
+//        String script = "<script>" +
+//                "window.opener.postMessage({" +
+//                "token: 'Bearer " + jwtToken + "'" +
+//                "}, 'https://colonydrop0079.com');" +    // ✅ 운영 도메인
+//                "window.close();" +
+//                "</script>";
+        //www.colonydrop0079.com 에서도 로그인 잘되도록 두도메인만 허용하는 방식으로 수정
         String script = "<script>" +
-                "window.opener.postMessage({" +
-                "token: 'Bearer " + jwtToken + "'" +
-                "}, 'https://colonydrop0079.com');" +    // ✅ 운영 도메인
+                "var allowedOrigins = ['https://colonydrop0079.com', 'https://www.colonydrop0079.com'];" +
+                "var parentOrigin = document.referrer ? new URL(document.referrer).origin : null;" +
+                "var targetOrigin = allowedOrigins.includes(parentOrigin) ? parentOrigin : allowedOrigins[0];" +
+                "window.opener.postMessage({token: 'Bearer " + jwtToken + "'}, targetOrigin);" +
                 "window.close();" +
                 "</script>";
-
         response.getWriter().write(script);
         response.getWriter().flush();
 
