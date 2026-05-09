@@ -28,71 +28,52 @@ public class PaymentService {
     @Transactional
     public void verifyPayment(PaymentVerifyRequest paymentVerifyRequest) throws Exception {
 
-        System.out.println("verify impUid: " + paymentVerifyRequest.getImpUid());
-        System.out.println("verify merchantUid: " + paymentVerifyRequest.getMerchantUid());
+        log.info("verify impUid: {}", paymentVerifyRequest.getImpUid());
+        log.info("verify merchantUid: {}", paymentVerifyRequest.getMerchantUid());
 
-        // 1. 포트원 API로 실제 결제 정보 조회
-        Payment payment = iamportClient
-                .paymentByImpUid(paymentVerifyRequest.getImpUid())
-                .getResponse();
-
-        //null 처리
-        if(payment == null){
-            throw new IllegalArgumentException("결제 정보가 존재하지 않습니다.");
-        }
-
-        // 2. DB에서 주문 조회 (merchantUid로)
-//        Order order = orderRepository.findByMerchantUid(paymentVerifyRequest
-//                .getMerchantUid()).orElseThrow(()-> new IllegalArgumentException("주문을 찾을수 없습니다."));
+        // 1. DB에서 주문 먼저 조회 — 웹훅이 이미 처리했으면 포트원 API 호출 불필요
         Order order = orderRepository.findByMerchantUid(paymentVerifyRequest.getMerchantUid())
-                .orElseThrow(() -> {
-                    System.out.println("주문 못찾음: " + paymentVerifyRequest.getMerchantUid());
-                    return new IllegalArgumentException("주문을 찾을수 없습니다.");
-                });
-        System.out.println("주문 찾음: " + order.getStatus());
+                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
 
-        // 3. 이미 처리된 주문인지 확인 (PENDING 상태인지)
-//        if (!"PENDING".equals(order.getStatus())) {
-//            throw new IllegalArgumentException("이미 처리된 주문입니다.");
-//        }
+        log.info("verify 주문 찾음: {}, status: {}", paymentVerifyRequest.getMerchantUid(), order.getStatus());
 
-        // PAID면 이미 웹훅이 처리한 것 → 성공으로 반환
+        // 웹훅이 이미 PAID 처리한 경우 → 성공으로 반환
         if ("PAID".equals(order.getStatus())) {
             return;
         }
-        // 그 외 PENDING이 아닌 상태 (CANCELLED 등) → 에러
+
+        // PENDING 외 다른 상태 (CANCELLED 등) → 에러
         if (!"PENDING".equals(order.getStatus())) {
             throw new IllegalArgumentException("이미 처리된 주문입니다.");
         }
 
-        // 4. 결제 금액 검증 (포트원 금액 vs DB 금액 비교)
+        // 2. 포트원 API로 실제 결제 정보 조회 (재시도 포함)
+        Payment payment = getPaymentWithRetry(paymentVerifyRequest.getImpUid());
+
+        if (payment == null) {
+            throw new IllegalArgumentException("결제 정보가 존재하지 않습니다.");
+        }
+
+        // 3. 결제 금액 검증
         if (payment.getAmount().compareTo(order.getTotalPrice()) != 0) {
-            // 금액 불일치 → 즉시 결제 취소
-//            iamportClient.cancelPaymentByImpUid(paymentVerifyRequest.getImpUid(), "금액 위변조 감지");
-            CancelData cancelData = new CancelData(
-                    paymentVerifyRequest.getImpUid(),
-                    true  // imp_uid 기준으로 취소
-            );
+            CancelData cancelData = new CancelData(paymentVerifyRequest.getImpUid(), true);
             cancelData.setReason("금액 위변조 감지");
             iamportClient.cancelPaymentByImpUid(cancelData);
             throw new IllegalStateException("결제 금액이 일치하지 않습니다.");
-        }  //    불일치 시 → 포트원 결제 즉시 취소 + 예외 발생
+        }
 
-
-        // 5. 결제 상태 확인 (paid 인지)
+        // 4. 결제 상태 확인
         if (!"paid".equals(payment.getStatus())) {
             throw new IllegalArgumentException("결제 실패!!");
         }
 
-        // 6. 주문 상태 PAID로 변경 + impUid 저장 + paidAt 저장
+        // 5. 주문 상태 PAID로 변경
         order.setImpUid(payment.getImpUid());
         order.setStatus("PAID");
         order.setPaidAt(LocalDateTime.now());
-        // 7. 상품 상태 SOLD로 변경
         order.getItem().setStatus("SOLD");
 
         orderRepository.save(order);
-
     }
 
     // 환불 메서드
@@ -200,58 +181,74 @@ public class PaymentService {
 //        orderRepository.save(order);
 //        log.info("웹훅으로 결제 완료 처리: {}", merchantUid);
 //    }
-// @Transactional 제거
+    @Transactional
     public void processWebhook(String impUid, String merchantUid, String status) throws Exception {
+        // 주문 조회 재시도 (DB 커밋 지연 대비)
         Order order = null;
         for (int i = 0; i < 3; i++) {
-            log.info("주문 조회 시도 {}: {}", i+1, merchantUid);
+            log.info("주문 조회 시도 {}: {}", i + 1, merchantUid);
             order = orderRepository.findByMerchantUid(merchantUid).orElse(null);
             if (order != null) {
                 log.info("주문 찾음: {}, status: {}", merchantUid, order.getStatus());
                 break;
             }
-            log.info("주문 못찾음 {}회차, 재시도...", i+1);
+            log.info("주문 못찾음 {}회차, 재시도...", i + 1);
             Thread.sleep(500);
         }
         if (order == null) {
             throw new IllegalArgumentException("존재하지 않는 결제정보입니다.");
         }
-        // 이미 처리된 주문이면 무시
+
+        // 이미 처리된 주문이면 무시 (웹훅 중복 방지)
         if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
             log.info("이미 처리된 주문 웹훅 무시: {}", merchantUid);
             return;
         }
+
         if (!"paid".equals(status)) {
             log.info("결제 미완료 웹훅 무시: {}, status: {}", merchantUid, status);
             return;
         }
 
-        // 포트원 서버 반영 대기
-        Thread.sleep(1000); // 1초 대기 추가
-
-
-        Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
+        // 포트원 API 조회 (404 시 재시도)
+        Payment payment = getPaymentWithRetry(impUid);
         if (payment == null) {
             throw new IllegalArgumentException("포트원에서 결제 정보를 찾을 수 없습니다.");
         }
+
         if (payment.getAmount().compareTo(order.getTotalPrice()) != 0) {
             CancelData cancelData = new CancelData(impUid, true);
             cancelData.setReason("금액 위변조 감지 (웹훅)");
             iamportClient.cancelPaymentByImpUid(cancelData);
             throw new IllegalStateException("결제 금액 불일치 - 자동 취소됨");
         }
-        // 저장은 별도 트랜잭션으로
-        saveWebhookResult(order, impUid);
-        log.info("웹훅으로 결제 완료 처리: {}", merchantUid);
-    }
 
-    @Transactional
-    public void saveWebhookResult(Order order, String impUid) {
         order.setImpUid(impUid);
         order.setStatus("PAID");
         order.setPaidAt(LocalDateTime.now());
         order.getItem().setStatus("SOLD");
         orderRepository.save(order);
+
+        log.info("웹훅으로 결제 완료 처리: {}", merchantUid);
+    }
+
+    // 포트원 API 조회 재시도 — 웹훅 직후 API가 아직 준비 안 된 경우 대비
+    private Payment getPaymentWithRetry(String impUid) throws Exception {
+        int[] delaysMs = {1000, 2000, 3000, 5000};
+        for (int i = 0; i <= delaysMs.length; i++) {
+            try {
+                Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
+                if (payment != null) return payment;
+            } catch (com.siot.IamportRestClient.exception.IamportResponseException e) {
+                if (e.getHttpStatusCode() == 404 && i < delaysMs.length) {
+                    log.warn("포트원 API 404, {}ms 후 재시도 ({}/{})", delaysMs[i], i + 1, delaysMs.length);
+                    Thread.sleep(delaysMs[i]);
+                    continue;
+                }
+                throw e;
+            }
+        }
+        return null;
     }
 
 
