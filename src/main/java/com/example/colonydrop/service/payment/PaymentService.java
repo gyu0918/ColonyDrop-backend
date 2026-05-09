@@ -15,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -189,6 +193,7 @@ public class PaymentService {
                     try (okhttp3.Response resp = client.newCall(request).execute()) {
                         String body = resp.body().string();
                         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
                         com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(body);
                         if (node.get("code").asInt() == 0) {
                             return mapper.treeToValue(node.get("response"), Payment.class);
