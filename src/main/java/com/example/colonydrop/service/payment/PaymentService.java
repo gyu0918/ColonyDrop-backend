@@ -43,6 +43,15 @@ public class PaymentService {
                 .getMerchantUid()).orElseThrow(()-> new IllegalArgumentException("주문을 찾을수 없습니다."));
 
         // 3. 이미 처리된 주문인지 확인 (PENDING 상태인지)
+//        if (!"PENDING".equals(order.getStatus())) {
+//            throw new IllegalArgumentException("이미 처리된 주문입니다.");
+//        }
+
+        // PAID면 이미 웹훅이 처리한 것 → 성공으로 반환
+        if ("PAID".equals(order.getStatus())) {
+            return;
+        }
+        // 그 외 PENDING이 아닌 상태 (CANCELLED 등) → 에러
         if (!"PENDING".equals(order.getStatus())) {
             throw new IllegalArgumentException("이미 처리된 주문입니다.");
         }
