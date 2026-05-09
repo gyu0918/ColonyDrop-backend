@@ -19,19 +19,17 @@ import java.time.LocalDateTime;
 @Slf4j
 @RequiredArgsConstructor
 public class PaymentService {
-    // 필요한 것들 주입 (IamportClient, OrderRepository)
+
     private final OrderRepository orderRepository;
     private final IamportClient iamportClient;
 
-    // 결제 검증 메서드
-    // 파라미터: PaymentVerifyRequest
     @Transactional
     public void verifyPayment(PaymentVerifyRequest paymentVerifyRequest) throws Exception {
 
         log.info("verify impUid: {}", paymentVerifyRequest.getImpUid());
         log.info("verify merchantUid: {}", paymentVerifyRequest.getMerchantUid());
 
-        // 1. DB에서 주문 먼저 조회 — 웹훅이 이미 처리했으면 포트원 API 호출 불필요
+        // 1. DB에서 주문 먼저 조회
         Order order = orderRepository.findByMerchantUid(paymentVerifyRequest.getMerchantUid())
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
 
@@ -48,8 +46,8 @@ public class PaymentService {
         }
 
         log.info("포트원 API 호출 시작");
-        // 2. 포트원 API로 실제 결제 정보 조회 (재시도 포함)
-        Payment payment = getPaymentWithRetry(paymentVerifyRequest.getImpUid());
+        // 2. merchantUid로 포트원 API 조회 (재시도 포함)
+        Payment payment = getPaymentWithRetry(paymentVerifyRequest.getImpUid(), paymentVerifyRequest.getMerchantUid());
         log.info("포트원 API 성공: {}", payment.getStatus());
 
         if (payment == null) {
@@ -78,29 +76,22 @@ public class PaymentService {
         orderRepository.save(order);
     }
 
-    // 환불 메서드
-    // 파라미터: PaymentRefundRequest
     @Transactional
     public void refundPayment(PaymentRefundRequest paymentRefundRequest) throws Exception {
 
-        // 1. 주문 조회 (merchantUid로)
         Order order = orderRepository.findByMerchantUid(paymentRefundRequest.getMerchantUid())
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을수 없습니다."));
 
-        // 2. PAID 상태인지 확인
         if (!"PAID".equals(order.getStatus())) {
             throw new IllegalArgumentException("환불 상태가 아닙니다 결제를 하지 않으셨습니다.");
         }
 
-        // 3. 환불 금액이 잔여 금액 초과하지 않는지 확인
-        //    잔여 금액 = totalPrice - refundedAmount
-        BigDecimal  remainAmount = order.getTotalPrice().subtract(order.getRefundedAmount());
+        BigDecimal remainAmount = order.getTotalPrice().subtract(order.getRefundedAmount());
 
         if (paymentRefundRequest.getRefundAmount().compareTo(remainAmount) > 0) {
             throw new IllegalStateException("환불 금액이 잔여 금액을 초과합니다.");
         }
 
-        // 4. 포트원 환불 API 호출 (CancelData 사용)
         CancelData cancelData = new CancelData(
                 order.getImpUid(),
                 true,
@@ -109,83 +100,23 @@ public class PaymentService {
         cancelData.setReason(paymentRefundRequest.getRefundReason());
         iamportClient.cancelPaymentByImpUid(cancelData);
 
-        // 5. 환불 금액 업데이트
         order.setRefundedAmount(
                 order.getRefundedAmount().add(paymentRefundRequest.getRefundAmount())
         );
 
-        // 6. 전액 환불이면 REFUNDED + 상품 SALE로 복구
-        //    부분 환불이면 PARTIALLY_REFUNDED
         if (order.getRefundedAmount().compareTo(order.getTotalPrice()) == 0) {
             order.setStatus("REFUNDED");
-            order.getItem().setStatus("SALE"); // 상품 다시 판매 가능
+            order.getItem().setStatus("SALE");
         } else {
             order.setStatus("PARTIALLY_REFUNDED");
         }
 
         orderRepository.save(order);
-
     }
 
-    //웹훅 처리
-//    @Transactional
-//    public void processWebhook(String impUid, String merchantUid, String status) throws Exception {
-//
-////        // 1. 주문 조회
-////        Order order = orderRepository.findByMerchantUid(merchantUid)
-////                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
-//
-//        // 1. 주문 조회 (최대 3회 재시도)
-//        Order order = null;
-//        for (int i = 0; i < 3; i++) {
-//            order = orderRepository.findByMerchantUid(merchantUid).orElse(null);
-//            if (order != null) break;
-//            Thread.sleep(500); // 0.5초 대기 후 재시도
-//        }
-//        if (order == null) {
-//            throw new IllegalArgumentException("존재하지 않는 결제정보입니다.");
-//        }
-//
-//        // 2. 이미 처리된 주문이면 무시 (웹훅 중복 방지)
-//        if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
-//            log.info("이미 처리된 주문 웹훅 무시: {}", merchantUid);
-//            return;
-//        }
-//
-//        // 3. paid 상태일 때만 검증 진행
-//        if (!"paid".equals(status)) {
-//            log.info("결제 미완료 웹훅 무시: {}, status: {}", merchantUid, status);
-//            return;
-//        }
-//
-//        // 4. 포트원 API로 실제 결제 정보 조회
-//        Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
-//
-//        if (payment == null) {
-//            throw new IllegalArgumentException("포트원에서 결제 정보를 찾을 수 없습니다.");
-//        }
-//
-//        // 5. 금액 검증
-//        if (payment.getAmount().compareTo(order.getTotalPrice()) != 0) {
-//            // 금액 불일치 → 즉시 취소
-//            CancelData cancelData = new CancelData(impUid, true);
-//            cancelData.setReason("금액 위변조 감지 (웹훅)");
-//            iamportClient.cancelPaymentByImpUid(cancelData);
-//            throw new IllegalStateException("결제 금액 불일치 - 자동 취소됨");
-//        }
-//
-//        // 6. 주문 상태 업데이트
-//        order.setImpUid(impUid);
-//        order.setStatus("PAID");
-//        order.setPaidAt(LocalDateTime.now());
-//        order.getItem().setStatus("SOLD");
-//
-//        orderRepository.save(order);
-//        log.info("웹훅으로 결제 완료 처리: {}", merchantUid);
-//    }
     @Transactional
     public void processWebhook(String impUid, String merchantUid, String status) throws Exception {
-        // 주문 조회 재시도 (DB 커밋 지연 대비)
+
         Order order = null;
         for (int i = 0; i < 3; i++) {
             log.info("주문 조회 시도 {}: {}", i + 1, merchantUid);
@@ -201,7 +132,6 @@ public class PaymentService {
             throw new IllegalArgumentException("존재하지 않는 결제정보입니다.");
         }
 
-        // 이미 처리된 주문이면 무시 (웹훅 중복 방지)
         if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
             log.info("이미 처리된 주문 웹훅 무시: {}", merchantUid);
             return;
@@ -212,8 +142,8 @@ public class PaymentService {
             return;
         }
 
-        // 포트원 API 조회 (404 시 재시도)
-        Payment payment = getPaymentWithRetry(impUid);
+        // merchantUid로 포트원 API 조회 (재시도 포함)
+        Payment payment = getPaymentWithRetry(impUid, merchantUid);
         if (payment == null) {
             throw new IllegalArgumentException("포트원에서 결제 정보를 찾을 수 없습니다.");
         }
@@ -234,8 +164,8 @@ public class PaymentService {
         log.info("웹훅으로 결제 완료 처리: {}", merchantUid);
     }
 
-    // 포트원 API 조회 재시도 — 웹훅 직후 API가 아직 준비 안 된 경우 대비
-    private Payment getPaymentWithRetry(String impUid) throws Exception {
+    // imp_uid 먼저 시도, 404면 merchant_uid로 재시도
+    private Payment getPaymentWithRetry(String impUid, String merchantUid) throws Exception {
         int[] delaysMs = {1000, 2000, 3000, 5000};
         for (int i = 0; i <= delaysMs.length; i++) {
             try {
@@ -247,11 +177,27 @@ public class PaymentService {
                     Thread.sleep(delaysMs[i]);
                     continue;
                 }
+                // 4회 재시도 후에도 404면 merchant_uid로 HTTP 직접 조회
+                if (e.getHttpStatusCode() == 404) {
+                    log.warn("imp_uid 조회 실패, merchant_uid로 조회 시도: {}", merchantUid);
+                    String token = iamportClient.getAuth().getResponse().getToken();
+                    okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+                    okhttp3.Request request = new okhttp3.Request.Builder()
+                            .url("https://api.iamport.kr/payments/find/" + merchantUid)
+                            .header("Authorization", token)
+                            .build();
+                    try (okhttp3.Response resp = client.newCall(request).execute()) {
+                        String body = resp.body().string();
+                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(body);
+                        if (node.get("code").asInt() == 0) {
+                            return mapper.treeToValue(node.get("response"), Payment.class);
+                        }
+                    }
+                }
                 throw e;
             }
         }
         return null;
     }
-
-
 }
