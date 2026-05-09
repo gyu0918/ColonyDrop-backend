@@ -32,6 +32,9 @@ public class OrderService {
     @Transactional
     public Order createOrder(Member member, OrderCreateRequest orderCreateRequest) {
 
+
+        // 이 줄 추가
+        System.out.println("받은 itemId: " + orderCreateRequest.getItemId());
         // 분산 락 키 (상품 ID 기준)
         String lockKey = "item:lock:" + orderCreateRequest.getItemId();
         RLock lock = redissonClient.getLock(lockKey);
