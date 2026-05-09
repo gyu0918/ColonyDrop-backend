@@ -28,6 +28,9 @@ public class PaymentService {
     @Transactional
     public void verifyPayment(PaymentVerifyRequest paymentVerifyRequest) throws Exception {
 
+        System.out.println("verify impUid: " + paymentVerifyRequest.getImpUid());
+        System.out.println("verify merchantUid: " + paymentVerifyRequest.getMerchantUid());
+
         // 1. 포트원 API로 실제 결제 정보 조회
         Payment payment = iamportClient
                 .paymentByImpUid(paymentVerifyRequest.getImpUid())
