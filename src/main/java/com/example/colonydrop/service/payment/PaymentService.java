@@ -47,8 +47,10 @@ public class PaymentService {
             throw new IllegalArgumentException("이미 처리된 주문입니다.");
         }
 
+        log.info("포트원 API 호출 시작");
         // 2. 포트원 API로 실제 결제 정보 조회 (재시도 포함)
         Payment payment = getPaymentWithRetry(paymentVerifyRequest.getImpUid());
+        log.info("포트원 API 성공: {}", payment.getStatus());
 
         if (payment == null) {
             throw new IllegalArgumentException("결제 정보가 존재하지 않습니다.");
