@@ -70,7 +70,7 @@ public class PaymentController {
             paymentService.processWebhook(impUid, merchantUid, status);
             return ResponseEntity.ok("OK");
         } catch (Exception e) {
-            log.error("웹훅 처리 실패: {}", e.getMessage());
+            log.error("웹훅 처리 실패: {}", e.getMessage(), e);
             // 포트원은 OK가 아니면 재시도함 → 500 반환
             return ResponseEntity.internalServerError().body(e.getMessage());
         }
