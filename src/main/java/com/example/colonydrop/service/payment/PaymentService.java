@@ -42,8 +42,14 @@ public class PaymentService {
         }
 
         // 2. DB에서 주문 조회 (merchantUid로)
-        Order order = orderRepository.findByMerchantUid(paymentVerifyRequest
-                .getMerchantUid()).orElseThrow(()-> new IllegalArgumentException("주문을 찾을수 없습니다."));
+//        Order order = orderRepository.findByMerchantUid(paymentVerifyRequest
+//                .getMerchantUid()).orElseThrow(()-> new IllegalArgumentException("주문을 찾을수 없습니다."));
+        Order order = orderRepository.findByMerchantUid(paymentVerifyRequest.getMerchantUid())
+                .orElseThrow(() -> {
+                    System.out.println("주문 못찾음: " + paymentVerifyRequest.getMerchantUid());
+                    return new IllegalArgumentException("주문을 찾을수 없습니다.");
+                });
+        System.out.println("주문 찾음: " + order.getStatus());
 
         // 3. 이미 처리된 주문인지 확인 (PENDING 상태인지)
 //        if (!"PENDING".equals(order.getStatus())) {
