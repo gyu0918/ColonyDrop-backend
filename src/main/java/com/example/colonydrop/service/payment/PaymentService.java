@@ -225,6 +225,11 @@ public class PaymentService {
             log.info("결제 미완료 웹훅 무시: {}, status: {}", merchantUid, status);
             return;
         }
+
+        // 포트원 서버 반영 대기
+        Thread.sleep(1000); // 1초 대기 추가
+
+
         Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
         if (payment == null) {
             throw new IllegalArgumentException("포트원에서 결제 정보를 찾을 수 없습니다.");
