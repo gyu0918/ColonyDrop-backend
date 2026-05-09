@@ -142,9 +142,20 @@ public class PaymentService {
     @Transactional
     public void processWebhook(String impUid, String merchantUid, String status) throws Exception {
 
-        // 1. 주문 조회
-        Order order = orderRepository.findByMerchantUid(merchantUid)
-                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
+//        // 1. 주문 조회
+//        Order order = orderRepository.findByMerchantUid(merchantUid)
+//                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
+
+        // 1. 주문 조회 (최대 3회 재시도)
+        Order order = null;
+        for (int i = 0; i < 3; i++) {
+            order = orderRepository.findByMerchantUid(merchantUid).orElse(null);
+            if (order != null) break;
+            Thread.sleep(500); // 0.5초 대기 후 재시도
+        }
+        if (order == null) {
+            throw new IllegalArgumentException("존재하지 않는 결제정보입니다.");
+        }
 
         // 2. 이미 처리된 주문이면 무시 (웹훅 중복 방지)
         if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
