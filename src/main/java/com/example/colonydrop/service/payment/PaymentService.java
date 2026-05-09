@@ -204,8 +204,13 @@ public class PaymentService {
     public void processWebhook(String impUid, String merchantUid, String status) throws Exception {
         Order order = null;
         for (int i = 0; i < 3; i++) {
+            log.info("주문 조회 시도 {}: {}", i+1, merchantUid);
             order = orderRepository.findByMerchantUid(merchantUid).orElse(null);
-            if (order != null) break;
+            if (order != null) {
+                log.info("주문 찾음: {}, status: {}", merchantUid, order.getStatus());
+                break;
+            }
+            log.info("주문 못찾음 {}회차, 재시도...", i+1);
             Thread.sleep(500);
         }
         if (order == null) {
