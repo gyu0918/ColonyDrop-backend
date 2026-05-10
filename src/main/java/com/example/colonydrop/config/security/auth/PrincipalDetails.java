@@ -98,4 +98,9 @@ public class PrincipalDetails implements UserDetails, OAuth2User {
     public Member getUser() {
         return member;
     }
+
+    public Member getMember() {
+        return member;
+    }
+
 }

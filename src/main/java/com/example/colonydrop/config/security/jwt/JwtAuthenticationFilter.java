@@ -110,6 +110,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
                 .withExpiresAt(new Date(System.currentTimeMillis() + (jwtProperties.getExpirationTime())))  //토큰 만료시간 60000 기준 1분
 //                .withClaim("id",principalDetails.getId())  //withClaim은 키 벨류값설
                 .withClaim("memberId", principalDetails.getUsername())
+                .withClaim("memberName", principalDetails.getMember().getMemberName()) // 닉네임용으로 추가
                 .sign(Algorithm.HMAC512(jwtProperties.getSecret()));
         //application.yml 혹은 환경변수에서 JWT_SECRET 값으로 관리합니다. 위에 이야기임
 
