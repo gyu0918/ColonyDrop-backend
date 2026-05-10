@@ -13,6 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -64,6 +65,16 @@ public class OrderController {
         String memberId = principalDetails.getUsername();
         OrderResponse order = orderService.getOrderDetail(merchantUid, memberId);
         return ResponseEntity.ok(order);
+    }
+
+    //주문취소
+    @PostMapping("/cancel")
+    public ResponseEntity<?> cancelOrder(@RequestBody Map<String, String> body,
+                                         @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        String merchantUid = body.get("merchantUid");
+        String memberId = principalDetails.getUsername();
+        orderService.cancelOrder(merchantUid, memberId);
+        return ResponseEntity.ok().build();
     }
 
 

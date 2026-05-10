@@ -120,5 +120,20 @@ public class OrderService {
         return new OrderResponse(order);
     }
 
+    //주문취소
+    @Transactional
+    public void cancelOrder(String merchantUid, String memberId) {
+        Order order = orderRepository.findByMerchantUidAndBuyerMemberId(merchantUid, memberId)
+                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
+
+        if (!"PENDING".equals(order.getStatus()) && !"RESERVED".equals(order.getStatus())) {
+            return; // 이미 처리된 주문은 무시
+        }
+
+        order.setStatus("CANCELLED");
+        order.getItem().setStatus("SALE"); // 상품 다시 판매 가능
+        orderRepository.save(order);
+    }
+
 
 }
