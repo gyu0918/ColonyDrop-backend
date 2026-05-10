@@ -2,6 +2,7 @@ package com.example.colonydrop.controller.order;
 
 
 import com.example.colonydrop.config.security.auth.PrincipalDetails;
+import com.example.colonydrop.dto.order.OrderResponse;
 import com.example.colonydrop.dto.payment.OrderCreateRequest;
 import com.example.colonydrop.entity.member.Member;
 import com.example.colonydrop.entity.order.Order;
@@ -9,10 +10,9 @@ import com.example.colonydrop.service.order.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -38,6 +38,31 @@ public class OrderController {
         // 1. OrderService.createOrder 호출
         Order order = orderService.createOrder(member, request);
         // 2. 생성된 Order 반환
+        return ResponseEntity.ok(order);
+    }
+
+    // 주문 내역 조회 API
+    // GET /api/orders/my
+    @GetMapping("/my")
+    public ResponseEntity<?> getMyOrders(@AuthenticationPrincipal PrincipalDetails principalDetails) {
+        if (principalDetails == null) {
+            return ResponseEntity.status(401).body("로그인이 필요합니다.");
+        }
+        String memberId = principalDetails.getUsername();
+        List<OrderResponse> orders = orderService.getMyOrders(memberId);
+        return ResponseEntity.ok(orders);
+    }
+
+    // 주문 상세 조회 API
+    // GET /api/orders/{merchantUid}
+    @GetMapping("/{merchantUid}")
+    public ResponseEntity<?> getOrderDetail(@PathVariable String merchantUid,
+                                            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        if (principalDetails == null) {
+            return ResponseEntity.status(401).body("로그인이 필요합니다.");
+        }
+        String memberId = principalDetails.getUsername();
+        OrderResponse order = orderService.getOrderDetail(merchantUid, memberId);
         return ResponseEntity.ok(order);
     }
 

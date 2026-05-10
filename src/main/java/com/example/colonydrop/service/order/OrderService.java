@@ -1,5 +1,6 @@
 package com.example.colonydrop.service.order;
 
+import com.example.colonydrop.dto.order.OrderResponse;
 import com.example.colonydrop.dto.payment.OrderCreateRequest;
 import com.example.colonydrop.entity.item.Item;
 import com.example.colonydrop.entity.member.Member;
@@ -15,8 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Random;
-import java.util.UUID;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -101,5 +101,24 @@ public class OrderService {
                 .mapToObj(i -> Integer.toString(i, 36).toUpperCase())
                 .collect(Collectors.joining());
     }
+
+
+    // 주문 내역 조회
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getMyOrders(String memberId) {
+        return orderRepository.findByBuyerMemberId(memberId)
+                .stream()
+                .map(OrderResponse::new)
+                .collect(Collectors.toList());
+    }
+
+    // 주문 상세 조회
+    @Transactional(readOnly = true)
+    public OrderResponse getOrderDetail(String merchantUid, String memberId) {
+        Order order = orderRepository.findByMerchantUidAndBuyerMemberId(merchantUid, memberId)
+                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
+        return new OrderResponse(order);
+    }
+
 
 }

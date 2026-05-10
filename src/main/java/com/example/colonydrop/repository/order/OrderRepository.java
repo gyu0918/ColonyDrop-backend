@@ -34,4 +34,21 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "WHERE o.status IN ('PENDING', 'RESERVED') " +
             "AND o.createdAt < :expireTime")
     List<Order> findExpiredOrders(@Param("expireTime") LocalDateTime expireTime);
+
+    //나의 주문 조회 (최신순)
+    @Query("SELECT o FROM Order o " +
+            "JOIN FETCH o.item " +
+            "WHERE o.buyer.memberId = :memberId " +
+            "ORDER BY o.createdAt DESC")
+    List<Order> findByBuyerMemberId(@Param("memberId") String memberId);
+
+    // 주문 상세 조회 (merchantUid + 본인 확인)
+    @Query("SELECT o FROM Order o " +
+            "JOIN FETCH o.item " +
+            "JOIN FETCH o.buyer " +
+            "WHERE o.merchantUid = :merchantUid " +
+            "AND o.buyer.memberId = :memberId")
+    Optional<Order> findByMerchantUidAndBuyerMemberId(
+            @Param("merchantUid") String merchantUid,
+            @Param("memberId") String memberId);
 }
