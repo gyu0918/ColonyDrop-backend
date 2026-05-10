@@ -170,39 +170,70 @@ public class PaymentService {
 
     // imp_uid 먼저 시도, 404면 merchant_uid로 재시도
     private Payment getPaymentWithRetry(String impUid, String merchantUid) throws Exception {
-        int[] delaysMs = {1000, 2000, 3000, 5000};
-        for (int i = 0; i <= delaysMs.length; i++) {
-            try {
-                Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
-                if (payment != null) return payment;
-            } catch (com.siot.IamportRestClient.exception.IamportResponseException e) {
-                if (e.getHttpStatusCode() == 404 && i < delaysMs.length) {
-                    log.warn("포트원 API 404, {}ms 후 재시도 ({}/{})", delaysMs[i], i + 1, delaysMs.length);
-                    Thread.sleep(delaysMs[i]);
-                    continue;
-                }
-                // 4회 재시도 후에도 404면 merchant_uid로 HTTP 직접 조회
-                if (e.getHttpStatusCode() == 404) {
-                    log.warn("imp_uid 조회 실패, merchant_uid로 조회 시도: {}", merchantUid);
-                    String token = iamportClient.getAuth().getResponse().getToken();
-                    okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
-                    okhttp3.Request request = new okhttp3.Request.Builder()
-                            .url("https://api.iamport.kr/payments/find/" + merchantUid)
-                            .header("Authorization", token)
-                            .build();
-                    try (okhttp3.Response resp = client.newCall(request).execute()) {
-                        String body = resp.body().string();
-                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-                        com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(body);
-                        if (node.get("code").asInt() == 0) {
-                            return mapper.treeToValue(node.get("response"), Payment.class);
-                        }
+        try {
+            // imp_uid로 먼저 시도
+            Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
+            if (payment != null) return payment;
+        } catch (com.siot.IamportRestClient.exception.IamportResponseException e) {
+            if (e.getHttpStatusCode() == 404) {
+                log.warn("imp_uid 404, merchant_uid로 즉시 조회: {}", merchantUid);
+                // 재시도 없이 바로 merchant_uid로 조회
+                String token = iamportClient.getAuth().getResponse().getToken();
+                okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+                okhttp3.Request request = new okhttp3.Request.Builder()
+                        .url("https://api.iamport.kr/payments/find/" + merchantUid)
+                        .header("Authorization", token)
+                        .build();
+                try (okhttp3.Response resp = client.newCall(request).execute()) {
+                    String body = resp.body().string();
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+                    com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(body);
+                    if (node.get("code").asInt() == 0) {
+                        return mapper.treeToValue(node.get("response"), Payment.class);
                     }
                 }
-                throw e;
             }
+            throw e;
         }
         return null;
     }
+
+//    private Payment getPaymentWithRetry(String impUid, String merchantUid) throws Exception {
+//        int[] delaysMs = {1000, 2000, 3000, 5000};
+//        for (int i = 0; i <= delaysMs.length; i++) {
+//            try {
+//                Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
+//                if (payment != null) return payment;
+//            } catch (com.siot.IamportRestClient.exception.IamportResponseException e) {
+//                if (e.getHttpStatusCode() == 404 && i < delaysMs.length) {
+//                    log.warn("포트원 API 404, {}ms 후 재시도 ({}/{})", delaysMs[i], i + 1, delaysMs.length);
+//                    Thread.sleep(delaysMs[i]);
+//                    continue;
+//                }
+//                // 4회 재시도 후에도 404면 merchant_uid로 HTTP 직접 조회
+//                if (e.getHttpStatusCode() == 404) {
+//                    log.warn("imp_uid 조회 실패, merchant_uid로 조회 시도: {}", merchantUid);
+//                    String token = iamportClient.getAuth().getResponse().getToken();
+//                    okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+//                    okhttp3.Request request = new okhttp3.Request.Builder()
+//                            .url("https://api.iamport.kr/payments/find/" + merchantUid)
+//                            .header("Authorization", token)
+//                            .build();
+//                    try (okhttp3.Response resp = client.newCall(request).execute()) {
+//                        String body = resp.body().string();
+//                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+//                        mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+//                        com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(body);
+//                        if (node.get("code").asInt() == 0) {
+//                            return mapper.treeToValue(node.get("response"), Payment.class);
+//                        }
+//                    }
+//                }
+//                throw e;
+//            }
+//        }
+//        return null;
+//    }
+
 }
