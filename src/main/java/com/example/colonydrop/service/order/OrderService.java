@@ -66,6 +66,9 @@ public class OrderService {
                     .item(item)
                     .totalPrice(item.getPrice())
                     .status("PENDING")
+                    .buyerName(orderCreateRequest.getBuyerName())
+                    .buyerTel(orderCreateRequest.getBuyerTel())
+                    .buyerAddr(orderCreateRequest.getBuyerAddr())
                     .build();
 
             // 5. DB 저장 후 반환

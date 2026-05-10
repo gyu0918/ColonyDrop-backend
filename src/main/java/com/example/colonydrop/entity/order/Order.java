@@ -51,6 +51,15 @@ public class Order {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
+    @Column(name = "buyer_name", length = 50)
+    private String buyerName;
+
+    @Column(name = "buyer_tel", length = 20)
+    private String buyerTel;
+
+    @Column(name = "buyer_addr", length = 200)
+    private String buyerAddr;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
