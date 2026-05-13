@@ -35,9 +35,22 @@ public class RedisConfig {
 //
 //    서버 시작 시 자동으로 구독 시작
 //    → 메시지 오면 RedisSubscriber.onMessage 호출
+//    @Bean
+//    public RedisMessageListenerContainer redisMessageListenerContainer(
+//            RedisConnectionFactory connectionFactory) {
+//        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+//        container.setConnectionFactory(connectionFactory);
+//        container.addMessageListener(redisSubscriber,
+//                new PatternTopic(RedisPublisher.CHANNEL_PREFIX + "*"));
+//        return container;
+//    }
+
+    //순환참조 해결
+    //redisConfig → redisSubscriber → redisConfig 순환 참조
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(
-            RedisConnectionFactory connectionFactory) {
+            RedisConnectionFactory connectionFactory,
+            RedisSubscriber redisSubscriber) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.addMessageListener(redisSubscriber,
