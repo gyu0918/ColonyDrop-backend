@@ -22,7 +22,10 @@ spring:
       port: 6379
 
   rabbitmq:
-    addresses: amqps://${RABBITMQ_USERNAME}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:5671
+    host: ${RABBITMQ_HOST}
+    port: 5671
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
     ssl:
       enabled: true
 
