@@ -32,8 +32,12 @@ public class OrderQueueConsumer {
 
         try {
             // Member 조회
-            Member member = memberRepository.findByMemberId(message.getMemberId())
-                    .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+//            Member member = memberRepository.findByMemberId(message.getMemberId())
+//                    .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+            Member member = memberRepository.findByMemberId(message.getMemberId());
+            if (member == null) {
+                throw new IllegalArgumentException("회원을 찾을 수 없습니다.");
+            }
 
             // 주문 생성
             String merchantUid = orderService.createOrderFromQueue(member, message);
