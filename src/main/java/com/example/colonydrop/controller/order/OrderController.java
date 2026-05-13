@@ -12,6 +12,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import com.example.colonydrop.dto.order.OrderQueueMessage;
+import com.example.colonydrop.queue.OrderQueueProducer;
+import java.util.UUID;
+
 import java.util.List;
 import java.util.Map;
 
@@ -21,7 +25,27 @@ import java.util.Map;
 public class OrderController {
     // OrderService 주입
     private final OrderService orderService;
+    //queue
+    private final OrderQueueProducer orderQueueProducer;
 
+    // 주문 생성 API
+    // POST /api/orders
+    // 파라미터: OrderCreateRequest, 현재 로그인한 Member
+//    @PostMapping
+//    public ResponseEntity<?> createOrder(@RequestBody OrderCreateRequest request,
+//                                         @AuthenticationPrincipal PrincipalDetails principalDetails) {
+//
+//        // 임시 테스트용 - 토큰 없을 때 처리
+//        if (principalDetails == null) {
+//            return ResponseEntity.ok("테스트 모드: 주문 API 정상 동작");
+//        }
+//
+//        Member member =  principalDetails.getUser();
+//        // 1. OrderService.createOrder 호출
+//        Order order = orderService.createOrder(member, request);
+//        // 2. 생성된 Order 반환
+//        return ResponseEntity.ok(order);
+//    }
 
     // 주문 생성 API
     // POST /api/orders
@@ -30,16 +54,31 @@ public class OrderController {
     public ResponseEntity<?> createOrder(@RequestBody OrderCreateRequest request,
                                          @AuthenticationPrincipal PrincipalDetails principalDetails) {
 
-        // 임시 테스트용 - 토큰 없을 때 처리
         if (principalDetails == null) {
-            return ResponseEntity.ok("테스트 모드: 주문 API 정상 동작");
+            return ResponseEntity.status(401).body("로그인이 필요합니다.");
         }
 
-        Member member =  principalDetails.getUser();
-        // 1. OrderService.createOrder 호출
-        Order order = orderService.createOrder(member, request);
-        // 2. 생성된 Order 반환
-        return ResponseEntity.ok(order);
+        Member member = principalDetails.getUser();
+
+        // 1. sessionId 생성 (WebSocket 채널 구분용)
+        String sessionId = UUID.randomUUID().toString();
+
+        // 2. 큐 메시지 생성
+        OrderQueueMessage message = new OrderQueueMessage(
+                sessionId,
+                member.getMemberId(),
+                request.getItemId(),
+                request.getBuyerName(),
+                request.getBuyerTel(),
+                request.getBuyerAddr()
+        );
+
+        // 3. RabbitMQ 큐에 적재 후 즉시 응답
+        orderQueueProducer.enqueue(message);
+        return ResponseEntity.ok(Map.of(
+                "status", "WAITING",
+                "sessionId", sessionId
+        ));
     }
 
     // 주문 내역 조회 API

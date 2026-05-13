@@ -1,5 +1,6 @@
 package com.example.colonydrop.service.order;
 
+import com.example.colonydrop.dto.order.OrderQueueMessage;
 import com.example.colonydrop.dto.order.OrderResponse;
 import com.example.colonydrop.dto.payment.OrderCreateRequest;
 import com.example.colonydrop.entity.item.Item;
@@ -100,6 +101,39 @@ public class OrderService {
                 .ints(length, 0, 36)
                 .mapToObj(i -> Integer.toString(i, 36).toUpperCase())
                 .collect(Collectors.joining());
+    }
+
+    @Transactional
+    public String createOrderFromQueue(Member member, OrderQueueMessage message) {
+        // 1. 상품 조회
+        Item item = itemRepository.findById(message.getItemId())
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        // 2. 판매 가능 여부 확인
+        if (!"SALE".equals(item.getStatus())) {
+            throw new IllegalArgumentException("품절되었습니다.");
+        }
+
+        // 3. 상품 RESERVED로 변경
+        item.setStatus("RESERVED");
+
+        // 4. merchantUid 생성
+        String merchantUid = createMerchantUid();
+
+        // 5. 주문 생성
+        Order order = Order.builder()
+                .merchantUid(merchantUid)
+                .buyer(member)
+                .item(item)
+                .totalPrice(item.getPrice())
+                .status("PENDING")
+                .buyerName(message.getBuyerName())
+                .buyerTel(message.getBuyerTel())
+                .buyerAddr(message.getBuyerAddr())
+                .build();
+
+        orderRepository.save(order);
+        return merchantUid;
     }
 
 
