@@ -13,10 +13,10 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 //RedisSubscriber를 Redis 채널에 등록
 //서버 시작 시 자동으로 구독 시작
 @Configuration
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class RedisConfig {
 
-    private final RedisSubscriber redisSubscriber;
+//    private final RedisSubscriber redisSubscriber;
 
     // ObjectMapper 빈 등록 (JsonProcessingException 해결)
 //    JSON 변환기 빈 등록
