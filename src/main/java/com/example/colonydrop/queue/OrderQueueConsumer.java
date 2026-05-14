@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
@@ -20,9 +21,13 @@ public class OrderQueueConsumer {
     private final OrderService orderService;
     private final MemberRepository memberRepository;
     private final RedisPublisher redisPublisher;
+    private final ObjectMapper objectMapper;
 
     @RabbitListener(queues = RabbitMQConfig.ORDER_QUEUE, concurrency = "1")
-    public void consume(OrderQueueMessage message) {
+    public void consume(String messageJson) {
+
+        OrderQueueMessage message = objectMapper.readValue(messageJson, OrderQueueMessage.class);
+
         String sessionId = message.getSessionId();
         log.info("큐 처리 시작 → sessionId: {}, memberId: {}",
                 sessionId, message.getMemberId());

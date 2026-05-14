@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 
 //결제하기 클릭 시
@@ -22,6 +23,7 @@ public class OrderQueueProducer {
     private final RabbitTemplate rabbitTemplate;
     private final RedisPublisher redisPublisher;
     private final RabbitAdmin rabbitAdmin;
+    private final ObjectMapper objectMapper;
 
     public void enqueue(OrderQueueMessage message) {
         // 현재 큐 대기 수 조회
@@ -55,10 +57,17 @@ public class OrderQueueProducer {
         //
         //→ Exchange가 라우팅 키 보고
         //→ order-queue로 전달
+//        rabbitTemplate.convertAndSend(
+//                RabbitMQConfig.ORDER_EXCHANGE,
+//                RabbitMQConfig.ORDER_ROUTING,
+//                message
+//        );
+        // 큐에 적재 시
+        String messageJson = objectMapper.writeValueAsString(message);
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.ORDER_EXCHANGE,
                 RabbitMQConfig.ORDER_ROUTING,
-                message
+                messageJson
         );
 
         // 즉시 대기 순번 전송
