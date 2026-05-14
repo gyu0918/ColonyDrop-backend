@@ -61,11 +61,19 @@ public class OrderController {
         Member member = principalDetails.getUser();
 
         // 1. sessionId 생성 (WebSocket 채널 구분용)
-        String sessionId = UUID.randomUUID().toString();
-
+//        String sessionId = UUID.randomUUID().toString();
+        String sessionId = request.getSessionId(); // UUID 직접 받음
         // 2. 큐 메시지 생성
+//        OrderQueueMessage message = new OrderQueueMessage(
+//                sessionId,
+//                member.getMemberId(),
+//                request.getItemId(),
+//                request.getBuyerName(),
+//                request.getBuyerTel(),
+//                request.getBuyerAddr()
+//        );
         OrderQueueMessage message = new OrderQueueMessage(
-                sessionId,
+                sessionId,  // 클라이언트에서 받은 sessionId 사용
                 member.getMemberId(),
                 request.getItemId(),
                 request.getBuyerName(),

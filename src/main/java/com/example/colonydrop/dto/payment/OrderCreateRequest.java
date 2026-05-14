@@ -22,4 +22,5 @@ public class OrderCreateRequest {
     private String buyerName;
     private String buyerTel;
     private String buyerAddr;
+    private String sessionId;
 }
