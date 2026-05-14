@@ -4,10 +4,12 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
+
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderStatusMessage {
+public class OrderStatusMessage  implements Serializable {
     private String status;
     private Integer queuePosition;
     private String merchantUid;

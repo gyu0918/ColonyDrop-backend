@@ -34,7 +34,9 @@ public class OrderQueueProducer {
             //→ 내가 4번째
             var props = rabbitAdmin.getQueueProperties(RabbitMQConfig.ORDER_QUEUE);
             if (props != null) {
-                queueCount = (Integer) props.get("QUEUE_MESSAGE_COUNT");
+//                queueCount = (Integer) props.get("QUEUE_MESSAGE_COUNT");
+                Object count = props.get("QUEUE_MESSAGE_COUNT");
+                queueCount = count != null ? ((Long) count).intValue() : 0;
             }
         } catch (Exception e) {
             log.warn("큐 사이즈 조회 실패, 기본값 사용", e);
