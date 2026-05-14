@@ -134,14 +134,19 @@ pipeline {
                             --auto-scaling-group-name ${env.NEXT_ASG} \
                             --policy-name TargetTrackingPolicy \
                             --policy-type TargetTrackingScaling \
-                            --target-tracking-configuration '{
-                                "PredefinedMetricSpecification": {
-                                    "PredefinedMetricType": "ASGAverageCPUUtilization"
-                                },
-                                "TargetValue": 70.0,
-                                "ScaleInCooldown": 600,
-                                "ScaleOutCooldown": 120
-                            }' \
+                            --target-tracking-configuration '{"PredefinedMetricSpecification":{"PredefinedMetricType":"ASGAverageCPUUtilization"},"TargetValue":70.0}' \
+                            --estimated-instance-warmup 120 \
+                            --region $REGION
+                    """
+                    // ScaleIn 쿨다운 별도 설정 (증식 현상 방지)
+                    sh """
+                        aws autoscaling put-scaling-policy \
+                            --auto-scaling-group-name ${env.NEXT_ASG} \
+                            --policy-name ScaleInPolicy \
+                            --policy-type SimpleScaling \
+                            --adjustment-type ChangeInCapacity \
+                            --scaling-adjustment -1 \
+                            --cooldown 600 \
                             --region $REGION
                     """
                     echo "Auto Scaling 정책 추가 완료!"
