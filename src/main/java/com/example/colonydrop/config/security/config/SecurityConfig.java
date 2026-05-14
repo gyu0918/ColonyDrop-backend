@@ -108,6 +108,10 @@ public class SecurityConfig {
                                 // 소셜 로그인때문에
                                 .requestMatchers("/login/oauth2/**", "/oauth2/**").permitAll()
 
+                                //모니터링 떄문에
+                                .requestMatchers("/actuator/prometheus").permitAll()
+                                .requestMatchers("/actuator/health").permitAll()
+
                                 //물품조회떄문에
                                 .requestMatchers("/api/products/**").permitAll()
                                 //결제부분 추가
