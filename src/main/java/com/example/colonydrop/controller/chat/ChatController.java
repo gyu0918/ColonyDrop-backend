@@ -28,28 +28,28 @@ public class ChatController {
 
     @MessageMapping("/chat/gundam")
     public void sendGundamMessage(ChatMessageDto message) throws JsonProcessingException {
-        message.setTime(java.time.LocalDateTime.now());
+        message.setTime(java.time.LocalDateTime.now().toString());
         message.setRoomType(ChatMessageDto.RoomType.GUNDAM);
         chatProducer.sendMessage("chat-gundam", message);
     }
 
     @MessageMapping("/chat/openrun")
     public void sendOpenrunMessage(ChatMessageDto message) throws JsonProcessingException {
-        message.setTime(java.time.LocalDateTime.now());
+        message.setTime(java.time.LocalDateTime.now().toString());
         message.setRoomType(ChatMessageDto.RoomType.OPENRUN);
         chatProducer.sendMessage("chat-openrun", message);
     }
 
     @MessageMapping("/chat/sharing")
     public void sendSharingMessage(ChatMessageDto message) throws JsonProcessingException {
-        message.setTime(java.time.LocalDateTime.now());
+        message.setTime(java.time.LocalDateTime.now().toString());
         message.setRoomType(ChatMessageDto.RoomType.SHARING);
         chatProducer.sendMessage("chat-sharing", message);
     }
 
     @MessageMapping("/chat/free")
     public void sendFreeMessage(ChatMessageDto message) throws JsonProcessingException {
-        message.setTime(java.time.LocalDateTime.now());
+        message.setTime(java.time.LocalDateTime.now().toString());
         message.setRoomType(ChatMessageDto.RoomType.FREE);
         chatProducer.sendMessage("chat-free", message);
     }

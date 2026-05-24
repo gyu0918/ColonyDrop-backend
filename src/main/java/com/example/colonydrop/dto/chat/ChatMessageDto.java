@@ -19,5 +19,5 @@ public class ChatMessageDto {
     private String senderId;
     private RoomType roomType;
     private String content;
-    private LocalDateTime time;
+    private String time;
 }
