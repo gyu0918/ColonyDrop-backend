@@ -196,10 +196,13 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
 
+import org.springframework.kafka.annotation.EnableKafka;
+
 import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@EnableKafka  // ← 이거 추가
 public class KafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers}")
