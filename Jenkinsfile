@@ -153,46 +153,61 @@ pipeline {
         stage('Health Check') {
             steps {
                 script {
-                    echo "${env.NEXT} Target Group 헬스 체크 중..."
+                    echo "${env.NEXT} 서버 헬스 체크 중..."
                     sleep 90
 
                     def allHealthy = false
-                    for (int i = 0; i < 30; i++) {
-                        def healthyCount = sh(
-                            script: """
-                                aws elbv2 describe-target-health \
-                                    --target-group-arn ${env.NEXT_TG_ARN} \
-                                    --region $REGION \
-                                    --query 'length(TargetHealthDescriptions[?TargetHealth.State==`healthy`])' \
-                                    --output text
-                            """,
-                            returnStdout: true
-                        ).trim().toInteger()
+                    for (int i = 0; i < 20; i++) {
+                        try {
+                            def instanceId = sh(
+                                script: """
+                                    aws autoscaling describe-auto-scaling-groups \
+                                        --auto-scaling-group-names ${env.NEXT_ASG} \
+                                        --region $REGION \
+                                        --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`][0].InstanceId' \
+                                        --output text
+                                """,
+                                returnStdout: true
+                            ).trim()
 
-                        def totalCount = sh(
-                            script: """
-                                aws elbv2 describe-target-health \
-                                    --target-group-arn ${env.NEXT_TG_ARN} \
-                                    --region $REGION \
-                                    --query 'length(TargetHealthDescriptions)' \
-                                    --output text
-                            """,
-                            returnStdout: true
-                        ).trim().toInteger()
+                            if (!instanceId || instanceId == 'None') {
+                                echo "${i+1}/20 시도 - 인스턴스 아직 InService 아님"
+                                sleep 30
+                                continue
+                            }
 
-                        echo "${i+1}/30 시도 - Healthy: ${healthyCount}/${totalCount}"
+                            def privateIp = sh(
+                                script: """
+                                    aws ec2 describe-instances \
+                                        --instance-ids ${instanceId} \
+                                        --region $REGION \
+                                        --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+                                        --output text
+                                """,
+                                returnStdout: true
+                            ).trim()
 
-                        if (totalCount > 0 && healthyCount == totalCount) {
-                            allHealthy = true
-                            break
+                            def httpCode = sh(
+                                script: "curl -s -o /dev/null -w '%{http_code}' http://${privateIp}:8080/actuator/health --max-time 5",
+                                returnStdout: true
+                            ).trim()
+
+                            echo "${i+1}/20 시도 - 응답 코드: ${httpCode} (IP: ${privateIp})"
+
+                            if (httpCode == '200') {
+                                allHealthy = true
+                                echo "헬스 체크 통과!"
+                                break
+                            }
+                        } catch (Exception e) {
+                            echo "${i+1}/20 시도 - 오류: ${e.message}"
                         }
-                        sleep 20
+                        sleep 30
                     }
 
                     if (!allHealthy) {
                         error "헬스 체크 실패! 배포 중단."
                     }
-                    echo "모든 인스턴스 헬스 체크 통과!"
                 }
             }
         }
