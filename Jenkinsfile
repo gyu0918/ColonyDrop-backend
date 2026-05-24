@@ -90,7 +90,7 @@ pipeline {
                         returnStdout: true
                     ).trim().toInteger()
 
-                    echo "현재 서버 수: ${currentCount}대 → ${env.NEXT} ASG ${currentCount}대 생성"
+                    echo "현재 서버 수: ${currentCount}대 → ${env.NEXT} ASG 생성"
 
                     sh """
                         aws autoscaling delete-auto-scaling-group \
@@ -118,10 +118,10 @@ pipeline {
                             --launch-template LaunchTemplateName=$LAUNCH_TEMPLATE,Version='\$Latest' \
                             --min-size 2 \
                             --max-size 3 \
-                            --desired-capacity ${currentCount} \
+                            --desired-capacity 2 \
                             --target-group-arns ${env.NEXT_TG_ARN} \
                             --vpc-zone-identifier 'subnet-0ed522794421a00dd,subnet-097daed735cb731f6' \
-                            --health-check-type ELB \
+                            --health-check-type EC2 \
                             --health-check-grace-period 120 \
                             --region $REGION
                     """
