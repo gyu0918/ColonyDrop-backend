@@ -124,7 +124,7 @@ pipeline {
                             --target-group-arns ${env.NEXT_TG_ARN} \
                             --vpc-zone-identifier 'subnet-0ed522794421a00dd,subnet-097daed735cb731f6' \
                             --health-check-type ELB \
-                            --health-check-grace-period 60 \
+                            --health-check-grace-period 120 \
                             --region $REGION
                     """
 
