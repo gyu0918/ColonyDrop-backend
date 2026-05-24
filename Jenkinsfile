@@ -116,8 +116,8 @@ pipeline {
                         aws autoscaling create-auto-scaling-group \
                             --auto-scaling-group-name ${env.NEXT_ASG} \
                             --launch-template LaunchTemplateName=$LAUNCH_TEMPLATE,Version='\$Latest' \
-                            --min-size 1 \
-                            --max-size 6 \
+                            --min-size 2 \
+                            --max-size 3 \
                             --desired-capacity ${currentCount} \
                             --target-group-arns ${env.NEXT_TG_ARN} \
                             --vpc-zone-identifier 'subnet-0ed522794421a00dd,subnet-097daed735cb731f6' \
