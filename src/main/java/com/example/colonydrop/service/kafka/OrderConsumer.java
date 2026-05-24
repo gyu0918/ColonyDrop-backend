@@ -23,7 +23,7 @@ public class OrderConsumer {
     private final RedisPublisher redisPublisher;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "order-queue", groupId = "colonydrop")
+    @KafkaListener(topics = "order-queue", groupId = "colonydrop", containerFactory = "kafkaListenerContainerFactory")
     public void consume(String messageJson) throws JsonProcessingException {
         OrderQueueMessage message = objectMapper.readValue(messageJson, OrderQueueMessage.class);
         String sessionId = message.getSessionId();
