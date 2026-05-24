@@ -80,12 +80,15 @@ dependencies {
     implementation 'org.springframework.session:spring-session-data-redis'
 
     //rabbitMQ를 위해서
-    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+//    implementation 'org.springframework.boot:spring-boot-starter-amqp'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
     //모니터링 위해서
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    //로컬에서 kafka사용을 위해서
+    implementation 'org.springframework.kafka:spring-kafka'
 }
 
 generateJava {

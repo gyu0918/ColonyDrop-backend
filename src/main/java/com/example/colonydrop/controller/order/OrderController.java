@@ -6,15 +6,16 @@ import com.example.colonydrop.dto.order.OrderResponse;
 import com.example.colonydrop.dto.payment.OrderCreateRequest;
 import com.example.colonydrop.entity.member.Member;
 import com.example.colonydrop.entity.order.Order;
+import com.example.colonydrop.service.kafka.OrderProducer;
 import com.example.colonydrop.service.order.OrderService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import com.example.colonydrop.dto.order.OrderQueueMessage;
-import com.example.colonydrop.queue.OrderQueueProducer;
-import java.util.UUID;
+
 
 import java.util.List;
 import java.util.Map;
@@ -26,7 +27,7 @@ public class OrderController {
     // OrderService 주입
     private final OrderService orderService;
     //queue
-    private final OrderQueueProducer orderQueueProducer;
+    private final OrderProducer orderProducer;
 
     // 주문 생성 API
     // POST /api/orders
@@ -52,7 +53,7 @@ public class OrderController {
     // 파라미터: OrderCreateRequest, 현재 로그인한 Member
     @PostMapping
     public ResponseEntity<?> createOrder(@RequestBody OrderCreateRequest request,
-                                         @AuthenticationPrincipal PrincipalDetails principalDetails) {
+                                         @AuthenticationPrincipal PrincipalDetails principalDetails) throws JsonProcessingException {
 
         if (principalDetails == null) {
             return ResponseEntity.status(401).body("로그인이 필요합니다.");
@@ -82,7 +83,10 @@ public class OrderController {
         );
 
         // 3. RabbitMQ 큐에 적재 후 즉시 응답
-        orderQueueProducer.enqueue(message);
+//        orderQueueProducer.enqueue(message);
+
+        //kafka 에 넣는다
+        orderProducer.sendOrder(message);
         return ResponseEntity.ok(Map.of(
                 "status", "WAITING",
                 "sessionId", sessionId

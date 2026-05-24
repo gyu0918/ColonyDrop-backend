@@ -119,6 +119,12 @@ public class SecurityConfig {
 //                                .requestMatchers("/api/payment/verify").authenticated()   // 결제 검증 → 로그인 필요
 //                                .requestMatchers("/api/payment/refund").hasRole("ADMIN")  // 환불 → 관리자만
 
+                                // 채팅 관련 추가
+                                .requestMatchers("/api/chat/**").permitAll()
+                                .requestMatchers("/api/site/**").permitAll()
+                                .requestMatchers("/ws/**").permitAll()
+                                .requestMatchers("/topic/**").permitAll()
+                                .requestMatchers("/app/**").permitAll()
                                 //webhook 처리
                                 .requestMatchers("/api/payment/webhook").permitAll() // ← 추가
 
