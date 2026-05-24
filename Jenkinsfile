@@ -5,9 +5,9 @@ pipeline {
         DOCKER_HUB_ID    = "kjk1526"
         IMAGE_NAME       = "colonydrop"
         REGION           = "ap-northeast-2"
-        BLUE_TG_ARN      = "arn:aws:elasticloadbalancing:ap-northeast-2:027551668655:targetgroup/colonydrop-tg-blue/2c3b563463b43962"
-        GREEN_TG_ARN     = "arn:aws:elasticloadbalancing:ap-northeast-2:027551668655:targetgroup/colonydrop-tg-green/0da47489e5afb350"
-        ALB_LISTENER_ARN = "arn:aws:elasticloadbalancing:ap-northeast-2:027551668655:listener/app/colonydrop-alb/8fc40534a09d62e7/d204bec7e8c8e032"
+        BLUE_TG_ARN      = "arn:aws:elasticloadbalancing:ap-northeast-2:706244675730:targetgroup/colonydrop-tg-blue/444aadce48a892d3"
+        GREEN_TG_ARN     = "arn:aws:elasticloadbalancing:ap-northeast-2:706244675730:targetgroup/colonydrop-tg-green/dc87fbbded49933a"
+        ALB_LISTENER_ARN = "arn:aws:elasticloadbalancing:ap-northeast-2:706244675730:listener/app/colonydrop-alb/62dd02ed5cd795fe/df6b062911d4ad2b"
         BLUE_ASG         = "colonydrop-autoscaling-blue"
         GREEN_ASG        = "colonydrop-autoscaling-green"
         LAUNCH_TEMPLATE  = "colonydrop-launch-template"
@@ -17,7 +17,7 @@ pipeline {
         stage('Pull') {
             steps {
                 git branch: 'main',
-                    credentialsId: 'github-token',
+                    credentialsId: 'github-credentials',
                     url: 'https://github.com/gyu0918/ColonyDrop-backend.git'
             }
         }
@@ -31,7 +31,7 @@ pipeline {
         stage('Docker Build & Push') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'docker-hub',
+                    credentialsId: 'dockerhub-credentials',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
@@ -122,7 +122,7 @@ pipeline {
                             --max-size 6 \
                             --desired-capacity ${currentCount} \
                             --target-group-arns ${env.NEXT_TG_ARN} \
-                            --vpc-zone-identifier 'subnet-0b844475ca17a4a16,subnet-0ed4476c534e85a13' \
+                            --vpc-zone-identifier 'subnet-0ed522794421a00dd,subnet-097daed735cb731f6' \
                             --health-check-type ELB \
                             --health-check-grace-period 60 \
                             --region $REGION
