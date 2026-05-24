@@ -92,7 +92,6 @@ pipeline {
 
                     echo "현재 서버 수: ${currentCount}대 → ${env.NEXT} ASG ${currentCount}대 생성"
 
-                    // 다음 ASG가 이미 존재하면 삭제
                     sh """
                         aws autoscaling delete-auto-scaling-group \
                             --auto-scaling-group-name ${env.NEXT_ASG} \
@@ -113,7 +112,6 @@ pipeline {
                         done
                     """
 
-                    // 새 ASG 생성
                     sh """
                         aws autoscaling create-auto-scaling-group \
                             --auto-scaling-group-name ${env.NEXT_ASG} \
@@ -128,7 +126,6 @@ pipeline {
                             --region $REGION
                     """
 
-                    // Auto Scaling 정책 추가 (배포마다 자동 생성)
                     sh """
                         aws autoscaling put-scaling-policy \
                             --auto-scaling-group-name ${env.NEXT_ASG} \
@@ -138,7 +135,6 @@ pipeline {
                             --estimated-instance-warmup 120 \
                             --region $REGION
                     """
-                    // ScaleIn 쿨다운 별도 설정 (증식 현상 방지)
                     sh """
                         aws autoscaling put-scaling-policy \
                             --auto-scaling-group-name ${env.NEXT_ASG} \
@@ -157,50 +153,46 @@ pipeline {
         stage('Health Check') {
             steps {
                 script {
-                    echo "${env.NEXT} 서버 헬스 체크 중..."
-                    def healthy = false
+                    echo "${env.NEXT} Target Group 헬스 체크 중..."
                     sleep 90
-                    for (int i = 0; i < 20; i++) {
-                        def instanceId = sh(
+
+                    def allHealthy = false
+                    for (int i = 0; i < 30; i++) {
+                        def healthyCount = sh(
                             script: """
-                                aws autoscaling describe-auto-scaling-groups \
-                                    --auto-scaling-group-names ${env.NEXT_ASG} \
+                                aws elbv2 describe-target-health \
+                                    --target-group-arn ${env.NEXT_TG_ARN} \
                                     --region $REGION \
-                                    --query 'AutoScalingGroups[0].Instances[0].InstanceId' \
+                                    --query 'length(TargetHealthDescriptions[?TargetHealth.State==`healthy`])' \
                                     --output text
                             """,
                             returnStdout: true
-                        ).trim()
+                        ).trim().toInteger()
 
-                        def ip = sh(
+                        def totalCount = sh(
                             script: """
-                                aws ec2 describe-instances \
-                                    --instance-ids ${instanceId} \
+                                aws elbv2 describe-target-health \
+                                    --target-group-arn ${env.NEXT_TG_ARN} \
                                     --region $REGION \
-                                    --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+                                    --query 'length(TargetHealthDescriptions)' \
                                     --output text
                             """,
                             returnStdout: true
-                        ).trim()
+                        ).trim().toInteger()
 
-                        def status = sh(
-                            script: "curl -s -o /dev/null -w '%{http_code}' http://${ip}:8080/ || echo '000'",
-                            returnStdout: true
-                        ).trim()
+                        echo "${i+1}/30 시도 - Healthy: ${healthyCount}/${totalCount}"
 
-                        echo "${i+1}/20 시도 - 응답 코드: ${status} (IP: ${ip})"
-
-                        if (status == '200' || status == '401') {
-                            healthy = true
+                        if (totalCount > 0 && healthyCount == totalCount) {
+                            allHealthy = true
                             break
                         }
-                        sleep 30
+                        sleep 20
                     }
 
-                    if (!healthy) {
+                    if (!allHealthy) {
                         error "헬스 체크 실패! 배포 중단."
                     }
-                    echo "헬스 체크 통과!"
+                    echo "모든 인스턴스 헬스 체크 통과!"
                 }
             }
         }
@@ -215,7 +207,8 @@ pipeline {
                             --default-actions Type=forward,TargetGroupArn=${env.NEXT_TG_ARN} \
                             --region $REGION
                     """
-                    echo "트래픽 전환 완료!"
+                    echo "트래픽 전환 완료! 드레이닝 대기 중... (30초)"
+                    sleep 30
                 }
             }
         }
