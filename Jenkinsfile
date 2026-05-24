@@ -159,19 +159,20 @@ pipeline {
                     def allHealthy = false
                     for (int i = 0; i < 20; i++) {
                         try {
+                            // ← 여기만 바뀜: 백틱 필터 제거, 첫 번째 인스턴스 ID 바로 조회
                             def instanceId = sh(
                                 script: """
                                     aws autoscaling describe-auto-scaling-groups \
                                         --auto-scaling-group-names ${env.NEXT_ASG} \
                                         --region $REGION \
-                                        --query 'AutoScalingGroups[0].Instances[?LifecycleState==`InService`][0].InstanceId' \
+                                        --query 'AutoScalingGroups[0].Instances[0].InstanceId' \
                                         --output text
                                 """,
                                 returnStdout: true
                             ).trim()
 
                             if (!instanceId || instanceId == 'None') {
-                                echo "${i+1}/20 시도 - 인스턴스 아직 InService 아님"
+                                echo "${i+1}/20 시도 - 인스턴스 아직 없음"
                                 sleep 30
                                 continue
                             }
