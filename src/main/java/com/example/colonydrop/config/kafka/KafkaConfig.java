@@ -302,12 +302,12 @@ public class KafkaConfig {
                 .build();
     }
 
-    @Bean
-    @Primary
-    public ObjectMapper objectMapper() {
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mapper.configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, false);
-        return mapper;
-    }
+//    @Bean
+//    @Primary
+//    public ObjectMapper objectMapper() {
+//        ObjectMapper mapper = new ObjectMapper();
+//        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+//        mapper.configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, false);
+//        return mapper;
+//    }
 }
