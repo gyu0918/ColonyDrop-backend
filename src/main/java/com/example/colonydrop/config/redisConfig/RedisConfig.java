@@ -21,9 +21,16 @@ public class RedisConfig {
     // ObjectMapper 빈 등록 (JsonProcessingException 해결)
 //    JSON 변환기 빈 등록
 //    RedisPublisher, RedisSubscriber에서 주입받아 사용
+//    @Bean
+//    public ObjectMapper objectMapper() {
+//        return new ObjectMapper();
+//    }
+
     @Bean
     public ObjectMapper objectMapper() {
-        return new ObjectMapper();
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(com.fasterxml.jackson.core.JsonGenerator.Feature.ESCAPE_NON_ASCII, false);
+        return mapper;
     }
 
 //    RedisMessageListenerContainer
