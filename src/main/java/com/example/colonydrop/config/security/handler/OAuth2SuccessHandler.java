@@ -38,7 +38,10 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 .withSubject(username)
                 .withClaim("memberId", username)
                 .withClaim("provider", provider)
-                .withClaim("memberName", principalDetails.getMember().getMemberName()) //닉네임 추가용
+//                .withClaim("memberName", principalDetails.getMember().getMemberName()) //닉네임 추가용
+                .withClaim("memberName", java.net.URLEncoder.encode(
+                        principalDetails.getMember().getMemberName(),
+                        java.nio.charset.StandardCharsets.UTF_8))
                 .withExpiresAt(new Date(System.currentTimeMillis() + jwtProperties.getExpirationTime()))
                 .sign(Algorithm.HMAC512(jwtProperties.getSecret()));
 
