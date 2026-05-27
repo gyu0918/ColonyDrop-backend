@@ -54,14 +54,29 @@ public class RedisConfig {
 
     //순환참조 해결
     //redisConfig → redisSubscriber → redisConfig 순환 참조
+//    @Bean
+//    public RedisMessageListenerContainer redisMessageListenerContainer(
+//            RedisConnectionFactory connectionFactory,
+//            RedisSubscriber redisSubscriber) {
+//        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+//        container.setConnectionFactory(connectionFactory);
+//        container.addMessageListener(redisSubscriber,
+//                new PatternTopic(RedisPublisher.CHANNEL_PREFIX + "*"));
+//        return container;
+//    }
+
     @Bean
     public RedisMessageListenerContainer redisMessageListenerContainer(
             RedisConnectionFactory connectionFactory,
             RedisSubscriber redisSubscriber) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
+        // 주문 채널 구독
         container.addMessageListener(redisSubscriber,
                 new PatternTopic(RedisPublisher.CHANNEL_PREFIX + "*"));
+        // 채팅 채널 구독
+        container.addMessageListener(redisSubscriber,
+                new PatternTopic(RedisPublisher.CHAT_CHANNEL_PREFIX + "*"));
         return container;
     }
 }
