@@ -128,5 +128,27 @@ public class OrderController {
         return ResponseEntity.ok().build();
     }
 
+    // 배송지 변경
+    @PatchMapping("/{merchantUid}/address")
+    public ResponseEntity<?> updateAddress(
+            @PathVariable String merchantUid,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+
+        if (principalDetails == null) {
+            return ResponseEntity.status(401).body("로그인이 필요합니다.");
+        }
+
+        String memberId = principalDetails.getUsername();
+        orderService.updateAddress(
+                merchantUid,
+                memberId,
+                body.get("buyerName"),
+                body.get("buyerTel"),
+                body.get("buyerAddr")
+        );
+        return ResponseEntity.ok().build();
+    }
+
 
 }

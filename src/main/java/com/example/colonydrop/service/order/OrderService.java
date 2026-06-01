@@ -176,5 +176,20 @@ public class OrderService {
         orderRepository.save(order);
     }
 
+    // 배송지 변경
+    @Transactional
+    public void updateAddress(String merchantUid, String memberId, String buyerName, String buyerTel, String buyerAddr) {
+        Order order = orderRepository.findByMerchantUidAndBuyerMemberId(merchantUid, memberId)
+                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
+
+        if (!"PAID".equals(order.getStatus())) {
+            throw new IllegalArgumentException("결제 완료 상태의 주문만 배송지 변경이 가능합니다.");
+        }
+
+        order.setBuyerName(buyerName);
+        order.setBuyerTel(buyerTel);
+        order.setBuyerAddr(buyerAddr);
+        orderRepository.save(order);
+    }
 
 }
