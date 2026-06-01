@@ -26,16 +26,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "WHERE o.impUid = :impUid")
     Optional<Order> findByImpUid(@Param("impUid") String impUid);
 
-
     // 만료된 주문 조회
-    // PENDING 또는 RESERVED 상태이면서 15분 이상 지난 주문
     @Query("SELECT o FROM Order o " +
             "JOIN FETCH o.item " +
             "WHERE o.status IN ('PENDING', 'RESERVED') " +
             "AND o.createdAt < :expireTime")
     List<Order> findExpiredOrders(@Param("expireTime") LocalDateTime expireTime);
 
-    //나의 주문 조회 (최신순)
+    // 나의 주문 조회 (최신순)
     @Query("SELECT o FROM Order o " +
             "JOIN FETCH o.item " +
             "WHERE o.buyer.memberId = :memberId " +
@@ -51,4 +49,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByMerchantUidAndBuyerMemberId(
             @Param("merchantUid") String merchantUid,
             @Param("memberId") String memberId);
+
+    // ✅ 관리자용 전체 주문 조회 (최신순)
+    @Query("SELECT o FROM Order o " +
+            "JOIN FETCH o.item " +
+            "JOIN FETCH o.buyer " +
+            "ORDER BY o.createdAt DESC")
+    List<Order> findAllWithItemAndBuyer();
 }

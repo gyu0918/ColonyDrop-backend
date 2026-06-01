@@ -108,3 +108,6 @@ management:
   endpoint:
     prometheus:
       enabled: true
+slack:
+  webhook:
+    url: ${SLACK_WEBHOOK_URL}

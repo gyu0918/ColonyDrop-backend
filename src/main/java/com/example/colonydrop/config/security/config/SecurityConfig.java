@@ -95,6 +95,10 @@ public class SecurityConfig {
 //                                .requestMatchers("/admin/**").hasRole("ADMIN")  //  특정 하나의 권한만 허용
 //                                .requestMatchers("/api/calorie/analyze").permitAll()
 
+
+                                //관리자용으로
+                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
                                 //결제 테스트를 위해 임시로 허용
                                 .requestMatchers("/api/orders/**", "/api/payment/**").permitAll()
 
@@ -119,6 +123,8 @@ public class SecurityConfig {
 //                                .requestMatchers("/api/payment/verify").authenticated()   // 결제 검증 → 로그인 필요
 //                                .requestMatchers("/api/payment/refund").hasRole("ADMIN")  // 환불 → 관리자만
 
+                                //문의내용 추가 부분
+                                .requestMatchers("/api/support/**").authenticated()
                                 // 채팅 관련 추가
                                 .requestMatchers("/api/chat/**").permitAll()
                                 .requestMatchers("/api/site/**").permitAll()
