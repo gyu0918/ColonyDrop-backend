@@ -44,7 +44,8 @@ public class OrderConsumer {
 
         } catch (IllegalArgumentException e) {
             log.warn("[OrderConsumer] 주문 실패 → {}", e.getMessage());
-            redisPublisher.publish(sessionId, OrderStatusMessage.soldOut());
+//            redisPublisher.publish(sessionId, OrderStatusMessage.soldOut());
+            redisPublisher.publish(sessionId, OrderStatusMessage.soldOut(e.getMessage())); // ← 수정
         } catch (Exception e) {
             log.error("[OrderConsumer] 주문 예외 → sessionId: {}", sessionId, e);
             redisPublisher.publish(sessionId, OrderStatusMessage.soldOut());

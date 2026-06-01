@@ -34,4 +34,8 @@ public class OrderStatusMessage  implements Serializable {
         return new OrderStatusMessage("SOLD_OUT", null, null,
                 "품절되었습니다.");
     }
+    // ✅ 추가
+    public static OrderStatusMessage soldOut(String message) {
+        return new OrderStatusMessage("SOLD_OUT", null, null, message);
+    }
 }
