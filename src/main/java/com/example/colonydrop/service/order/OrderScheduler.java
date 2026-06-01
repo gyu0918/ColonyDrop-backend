@@ -26,7 +26,7 @@ public class OrderScheduler {
     public void cancelExpiredOrders() {
 
         // 15분 이상 PENDING/RESERVED 상태인 주문 조회
-        LocalDateTime expireTime = LocalDateTime.now().minusMinutes(15);
+        LocalDateTime expireTime = LocalDateTime.now().minusMinutes(5);
 
         List<Order> expiredOrders = orderRepository
                 .findExpiredOrders(expireTime);

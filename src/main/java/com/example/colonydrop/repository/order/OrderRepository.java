@@ -56,4 +56,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "JOIN FETCH o.buyer " +
             "ORDER BY o.createdAt DESC")
     List<Order> findAllWithItemAndBuyer();
+
+    //한아이디당 한개의 제품만 구매하도록
+    @Query("SELECT COUNT(o) > 0 FROM Order o " +
+            "WHERE o.buyer.memberId = :memberId " +
+            "AND o.status IN ('PENDING', 'RESERVED')")
+    boolean existsActiveOrderByMemberId(@Param("memberId") String memberId);
 }

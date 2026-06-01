@@ -86,9 +86,22 @@ public class PaymentService {
         Order order = orderRepository.findByMerchantUid(paymentRefundRequest.getMerchantUid())
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을수 없습니다."));
 
-        if (!"PAID".equals(order.getStatus())) {
-            throw new IllegalArgumentException("환불 상태가 아닙니다 결제를 하지 않으셨습니다.");
+        // ✅ 배송중/배송완료 상태면 환불 불가
+        if ("SHIPPING".equals(order.getStatus())) {
+            throw new IllegalArgumentException("배송 중인 주문은 환불이 불가합니다.");
         }
+        if ("DELIVERED".equals(order.getStatus())) {
+            throw new IllegalArgumentException("배송 완료된 주문은 환불이 불가합니다.");
+        }
+
+        // ✅ PAID 상태만 환불 가능
+        if (!"PAID".equals(order.getStatus())) {
+            throw new IllegalArgumentException("결제 완료 상태의 주문만 환불 가능합니다.");
+        }
+
+//        if (!"PAID".equals(order.getStatus())) {
+//            throw new IllegalArgumentException("환불 상태가 아닙니다 결제를 하지 않으셨습니다.");
+//        }
 
         BigDecimal remainAmount = order.getTotalPrice().subtract(order.getRefundedAmount());
 

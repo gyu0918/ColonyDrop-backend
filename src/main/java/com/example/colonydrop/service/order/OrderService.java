@@ -105,6 +105,13 @@ public class OrderService {
 
     @Transactional
     public String createOrderFromQueue(Member member, OrderQueueMessage message) {
+
+        // ✅ 한 아이디당 한 개 주문만 가능
+        if (orderRepository.existsActiveOrderByMemberId(member.getMemberId())) {
+            throw new IllegalArgumentException("이미 진행 중인 주문이 있습니다. 결제를 완료하거나 취소 후 다시 시도해주세요.");
+        }
+
+
         // 1. 상품 조회
         Item item = itemRepository.findById(message.getItemId())
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
