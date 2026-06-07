@@ -103,47 +103,103 @@ public class OrderService {
                 .collect(Collectors.joining());
     }
 
+//    @Transactional
+//    public String createOrderFromQueue(Member member, OrderQueueMessage message) {
+//
+//        // ✅ 한 아이디당 한 개 주문만 가능
+//        if (orderRepository.existsActiveOrderByMemberId(member.getMemberId())) {
+//            throw new IllegalArgumentException("이미 진행 중인 주문이 있습니다. 결제를 완료하거나 취소 후 다시 시도해주세요.");
+//        }
+//
+//
+//        // 1. 상품 조회
+//        Item item = itemRepository.findById(message.getItemId())
+//                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+//
+//        // 2. 판매 가능 여부 확인
+//        if (!"SALE".equals(item.getStatus())) {
+//            throw new IllegalArgumentException("품절되었습니다.");
+//        }
+//
+//        // 3. 상품 RESERVED로 변경
+//        item.setStatus("RESERVED");
+//
+//        // 4. merchantUid 생성
+//        String merchantUid = createMerchantUid();
+//
+//        // 5. 주문 생성
+//        Order order = Order.builder()
+//                .merchantUid(merchantUid)
+//                .buyer(member)
+//                .item(item)
+//                .totalPrice(item.getPrice())
+//                .status("PENDING")
+//                .buyerName(message.getBuyerName())
+//                .buyerTel(message.getBuyerTel())
+//                .buyerAddr(message.getBuyerAddr())
+//                .build();
+//
+//        orderRepository.save(order);
+//        return merchantUid;
+//    }
+
     @Transactional
     public String createOrderFromQueue(Member member, OrderQueueMessage message) {
 
-        // ✅ 한 아이디당 한 개 주문만 가능
-        if (orderRepository.existsActiveOrderByMemberId(member.getMemberId())) {
-            throw new IllegalArgumentException("이미 진행 중인 주문이 있습니다. 결제를 완료하거나 취소 후 다시 시도해주세요.");
+        // ✅ 분산락 추가
+        String lockKey = "item:lock:" + message.getItemId();
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            boolean isLocked = lock.tryLock(5, 3, TimeUnit.SECONDS);
+            if (!isLocked) {
+                throw new IllegalStateException("잠시 후 다시 시도해주세요.");
+            }
+
+            // ✅ 한 아이디당 한 개 주문만 가능
+            if (orderRepository.existsActiveOrderByMemberId(member.getMemberId())) {
+                throw new IllegalArgumentException("이미 진행 중인 주문이 있습니다. 결제를 완료하거나 취소 후 다시 시도해주세요.");
+            }
+
+            // 1. 상품 조회
+            Item item = itemRepository.findById(message.getItemId())
+                    .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+            // 2. 판매 가능 여부 확인
+            if (!"SALE".equals(item.getStatus())) {
+                throw new IllegalArgumentException("품절되었습니다.");
+            }
+
+            // 3. 상품 RESERVED로 변경
+            item.setStatus("RESERVED");
+
+            // 4. merchantUid 생성
+            String merchantUid = createMerchantUid();
+
+            // 5. 주문 생성
+            Order order = Order.builder()
+                    .merchantUid(merchantUid)
+                    .buyer(member)
+                    .item(item)
+                    .totalPrice(item.getPrice())
+                    .status("PENDING")
+                    .buyerName(message.getBuyerName())
+                    .buyerTel(message.getBuyerTel())
+                    .buyerAddr(message.getBuyerAddr())
+                    .build();
+
+            orderRepository.save(order);
+            return merchantUid;
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("주문 처리 중 오류가 발생했습니다.");
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
-
-
-        // 1. 상품 조회
-        Item item = itemRepository.findById(message.getItemId())
-                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
-
-        // 2. 판매 가능 여부 확인
-        if (!"SALE".equals(item.getStatus())) {
-            throw new IllegalArgumentException("품절되었습니다.");
-        }
-
-        // 3. 상품 RESERVED로 변경
-        item.setStatus("RESERVED");
-
-        // 4. merchantUid 생성
-        String merchantUid = createMerchantUid();
-
-        // 5. 주문 생성
-        Order order = Order.builder()
-                .merchantUid(merchantUid)
-                .buyer(member)
-                .item(item)
-                .totalPrice(item.getPrice())
-                .status("PENDING")
-                .buyerName(message.getBuyerName())
-                .buyerTel(message.getBuyerTel())
-                .buyerAddr(message.getBuyerAddr())
-                .build();
-
-        orderRepository.save(order);
-        return merchantUid;
     }
-
-
     // 주문 내역 조회
     @Transactional(readOnly = true)
     public List<OrderResponse> getMyOrders(String memberId) {
