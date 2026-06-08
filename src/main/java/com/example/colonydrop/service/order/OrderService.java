@@ -171,7 +171,8 @@ public class OrderService {
             }
 
             // 3. 상품 RESERVED로 변경
-            item.setStatus("RESERVED");
+            //RESERVED 제거 - 방식2: 결제 완료(verify) 시점에 재고 차감
+//            item.setStatus("RESERVED");
 
             // 4. merchantUid 생성
             String merchantUid = createMerchantUid();
@@ -228,7 +229,13 @@ public class OrderService {
         }
 
         order.setStatus("CANCELLED");
-        order.getItem().setStatus("SALE"); // 상품 다시 판매 가능
+//        order.getItem().setStatus("SALE"); // 상품 다시 판매 가능
+
+        // ✅ 방식2: 상품이 SOLD가 아닐 때만 SALE로 복구
+        //    (다른 사람이 이미 결제 완료해서 SOLD면 건드리지 않음)
+        if (!"SOLD".equals(order.getItem().getStatus())) {
+            order.getItem().setStatus("SALE");
+        }
         orderRepository.save(order);
     }
 

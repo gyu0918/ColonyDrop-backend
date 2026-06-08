@@ -1,5 +1,52 @@
+//package com.example.colonydrop.service.order;
+//
+//
+//import com.example.colonydrop.entity.order.Order;
+//import com.example.colonydrop.repository.order.OrderRepository;
+//import lombok.RequiredArgsConstructor;
+//import lombok.extern.slf4j.Slf4j;
+//import org.springframework.scheduling.annotation.Scheduled;
+//import org.springframework.stereotype.Component;
+//import org.springframework.transaction.annotation.Transactional;
+//
+//import java.time.LocalDateTime;
+//import java.util.List;
+//
+//
+//@Slf4j
+//@Component
+//@RequiredArgsConstructor
+//public class OrderScheduler {
+//
+//    private final OrderRepository orderRepository;
+//
+//    // 1분마다 실행
+//    @Scheduled(fixedDelay = 60000)
+//    @Transactional
+//    public void cancelExpiredOrders() {
+//
+//        // 15분 이상 PENDING/RESERVED 상태인 주문 조회
+//        LocalDateTime expireTime = LocalDateTime.now().minusMinutes(5);
+//
+//        List<Order> expiredOrders = orderRepository
+//                .findExpiredOrders(expireTime);
+//
+//        for (Order order : expiredOrders) {
+//            log.info("만료 주문 취소: {}", order.getMerchantUid());
+//
+//            // 상품 SALE로 복구
+//            order.getItem().setStatus("SALE");
+//
+//            // 주문 CANCELLED로 변경
+//            order.setStatus("CANCELLED");
+//        }
+//
+//        if (!expiredOrders.isEmpty()) {
+//            log.info("총 {}건 만료 주문 처리 완료", expiredOrders.size());
+//        }
+//    }
+//}
 package com.example.colonydrop.service.order;
-
 
 import com.example.colonydrop.entity.order.Order;
 import com.example.colonydrop.repository.order.OrderRepository;
@@ -11,7 +58,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
 
 @Slf4j
 @Component
@@ -25,7 +71,7 @@ public class OrderScheduler {
     @Transactional
     public void cancelExpiredOrders() {
 
-        // 15분 이상 PENDING/RESERVED 상태인 주문 조회
+        // 5분 이상 PENDING 상태인 주문 조회
         LocalDateTime expireTime = LocalDateTime.now().minusMinutes(5);
 
         List<Order> expiredOrders = orderRepository
@@ -34,8 +80,11 @@ public class OrderScheduler {
         for (Order order : expiredOrders) {
             log.info("만료 주문 취소: {}", order.getMerchantUid());
 
-            // 상품 SALE로 복구
-            order.getItem().setStatus("SALE");
+            // ✅ 방식2: 상품이 SOLD가 아닐 때만 SALE로 복구
+            //    (이미 다른 사람이 결제 완료해서 SOLD면 건드리지 않음)
+            if (!"SOLD".equals(order.getItem().getStatus())) {
+                order.getItem().setStatus("SALE");
+            }
 
             // 주문 CANCELLED로 변경
             order.setStatus("CANCELLED");
