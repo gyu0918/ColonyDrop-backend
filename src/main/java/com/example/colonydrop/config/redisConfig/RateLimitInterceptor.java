@@ -51,7 +51,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
         // 전체 API → IP 기반 1분 100회 제한
         String ip = getClientIp(request);
-        if (!rateLimitService.isAllowed("ip:" + ip, 100, 60)) {
+        if (!rateLimitService.isAllowed("ip:" + ip, 600, 60)) {
             response.setStatus(429);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write(
