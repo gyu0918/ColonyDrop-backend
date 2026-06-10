@@ -84,6 +84,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
@@ -97,8 +98,11 @@ public class ChatConsumer {
     private final RedisPublisher redisPublisher;
     private final StringRedisTemplate redisTemplate;
 
+
+
     @KafkaListener(topics = "chat-gundam", groupId = "colonydrop", containerFactory = "kafkaListenerContainerFactory")
     public void consumeGundam(String message) throws JsonProcessingException {
+        log.info("[ChatConsumer] 건담 수신 시각={}", java.time.LocalDateTime.now()); // ✅ 이것만 추가
         ChatMessageDto dto = objectMapper.readValue(message, ChatMessageDto.class);
         log.info("[ChatConsumer] 건담채팅방 senderId={}, content={}", dto.getSenderId(), dto.getContent());
         redisPublisher.publishChat("gundam", dto);
