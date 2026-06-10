@@ -71,6 +71,9 @@ public class RedisConfig {
             RedisSubscriber redisSubscriber) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
+
+        //장기간 연결시 끊어지는 현상 방지
+        container.setRecoveryInterval(3000L);  // (3초마다 재연결 시도)
         // 주문 채널 구독
         container.addMessageListener(redisSubscriber,
                 new PatternTopic(RedisPublisher.CHANNEL_PREFIX + "*"));
