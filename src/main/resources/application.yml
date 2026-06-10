@@ -33,8 +33,9 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      fetch-max-wait: 100        # ✅ 추가 (기본 500ms → 100ms)
-      fetch-min-size: 1          # ✅ 추가 (1바이트만 있어도 즉시 처리)
+      properties:
+        fetch.max.wait.ms: 100    # ✅ 축약형 대신 정확한 Kafka 프로퍼티명
+        fetch.min.bytes: 1        # ✅ fetch-min-size 대신
 
   security:
     oauth2:
