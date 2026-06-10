@@ -1,14 +1,19 @@
 package com.example.colonydrop.config.redisConfig;
 
-import com.example.colonydrop.config.redisConfig.RedisSubscriber;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
+import java.time.Duration;
 
 //RedisSubscriber를 Redis 채널에 등록
 //서버 시작 시 자동으로 구독 시작
@@ -82,4 +87,33 @@ public class RedisConfig {
                 new PatternTopic(RedisPublisher.CHAT_CHANNEL_PREFIX + "*"));
         return container;
     }
+
+    @Value("${spring.data.redis.host}")
+    private String redisHost;
+
+    @Value("${spring.data.redis.port}")
+    private int redisPort;
+
+    @Bean
+    public RedisConnectionFactory redisConnectionFactory() {
+        RedisStandaloneConfiguration serverConfig = new RedisStandaloneConfiguration();
+        serverConfig.setHostName(redisHost);
+        serverConfig.setPort(redisPort);
+
+        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
+                .clientOptions(ClientOptions.builder()
+                        .socketOptions(SocketOptions.builder()
+                                .keepAlive(SocketOptions.KeepAliveOptions.builder()
+                                        .enable()
+                                        .idle(Duration.ofSeconds(30))
+                                        .interval(Duration.ofSeconds(10))
+                                        .count(3)
+                                        .build())
+                                .build())
+                        .build())
+                .build();
+
+        return new LettuceConnectionFactory(serverConfig, clientConfig);
+    }
+
 }
