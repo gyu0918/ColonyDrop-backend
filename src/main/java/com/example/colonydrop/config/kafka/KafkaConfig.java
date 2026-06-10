@@ -251,6 +251,8 @@ public class KafkaConfig {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, 100);  // ✅ 추가 (기본 500ms → 100ms)
+        props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 1);       // ✅ 추가 (즉시 처리)
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
