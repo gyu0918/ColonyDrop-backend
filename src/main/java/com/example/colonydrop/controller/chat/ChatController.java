@@ -30,6 +30,7 @@ public class ChatController {
 
     @MessageMapping("/chat/gundam")
     public void sendGundamMessage(ChatMessageDto message) throws JsonProcessingException {
+        log.info("[ChatController] 건담 전송 시각={}", java.time.LocalDateTime.now());
         message.setTime(java.time.LocalDateTime.now().toString());
         message.setRoomType(ChatMessageDto.RoomType.GUNDAM);
 //        chatProducer.sendMessage("chat-gundam", message);
