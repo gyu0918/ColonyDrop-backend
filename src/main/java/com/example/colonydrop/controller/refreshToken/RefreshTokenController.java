@@ -127,7 +127,7 @@ public class RefreshTokenController {
         //    3-3	클라이언트에 전달 (헤더 or JSON or 쿠키)
         ResponseCookie newRefreshCookie = ResponseCookie.from("refreshToken", newRefreshToken)
                 .httpOnly(true)
-                .secure(false)     //true :  https 통신일 경우에만 쿠키 전송 false : http 통신일 경우에만 쿠키 전송
+                .secure(true)     //true :  https 통신일 경우에만 쿠키 전송 false : http 통신일 경우에만 쿠키 전송
                 .path("/")
                 .maxAge(Duration.ofDays(14))   //JWT의 refreshToken 만료 시간과 쿠키의 maxAge를 동일
                 .sameSite("None")  //  sameSite 설정을 해줘야지 csrf보안 처리를 안할수 있고
