@@ -272,37 +272,37 @@ public class KafkaConfig {
                 .build();
     }
 
-    @Bean
-    public NewTopic gundamChat() {
-        return TopicBuilder.name("chat-gundam")
-                .partitions(1)
-                .replicas(3)
-                .build();
-    }
-
-    @Bean
-    public NewTopic openrunChat() {
-        return TopicBuilder.name("chat-openrun")
-                .partitions(1)
-                .replicas(3)
-                .build();
-    }
-
-    @Bean
-    public NewTopic sharingChat() {
-        return TopicBuilder.name("chat-sharing")
-                .partitions(1)
-                .replicas(3)
-                .build();
-    }
-
-    @Bean
-    public NewTopic freeChat() {
-        return TopicBuilder.name("chat-free")
-                .partitions(1)
-                .replicas(3)
-                .build();
-    }
+//    @Bean
+//    public NewTopic gundamChat() {
+//        return TopicBuilder.name("chat-gundam")
+//                .partitions(1)
+//                .replicas(3)
+//                .build();
+//    }
+//
+//    @Bean
+//    public NewTopic openrunChat() {
+//        return TopicBuilder.name("chat-openrun")
+//                .partitions(1)
+//                .replicas(3)
+//                .build();
+//    }
+//
+//    @Bean
+//    public NewTopic sharingChat() {
+//        return TopicBuilder.name("chat-sharing")
+//                .partitions(1)
+//                .replicas(3)
+//                .build();
+//    }
+//
+//    @Bean
+//    public NewTopic freeChat() {
+//        return TopicBuilder.name("chat-free")
+//                .partitions(1)
+//                .replicas(3)
+//                .build();
+//    }
 
 //    @Bean
 //    @Primary

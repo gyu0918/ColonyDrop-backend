@@ -66,9 +66,9 @@ public class ChatProducer {
         }
     }
 
-    public void sendMessage(String topic, ChatMessageDto message) throws JsonProcessingException {
-        String json = objectMapper.writeValueAsString(message);
-        log.info("[ChatProducer] topic={}, message={}", topic, json);
-        kafkaTemplate.send(topic, json);
-    }
+//    public void sendMessage(String topic, ChatMessageDto message) throws JsonProcessingException {
+//        String json = objectMapper.writeValueAsString(message);
+//        log.info("[ChatProducer] topic={}, message={}", topic, json);
+//        kafkaTemplate.send(topic, json);
+//    }
 }
