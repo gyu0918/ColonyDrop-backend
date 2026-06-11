@@ -80,7 +80,7 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))   //react랑 연결용 cors허용
                 .csrf(AbstractHttpConfigurer::disable)  //jwt방식은 세션 없기 때문에 불필요 해서 처리함
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)) //서버가 로그인 세션을 유지하지 않음 그래서 왜냐 토큰 방식이니까!!  그래서 stateless처리 해준다.
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) //서버가 로그인 세션을 유지하지 않음 그래서 왜냐 토큰 방식이니까!!  그래서 stateless처리 해준다.
                 .addFilter(jwtAuthenticationFilter)  // 이부분이 처음 로그인할때만 동작한다.
 //                .addFilter(new JwtAuthorizationFilter(authenticationManager, memberRepository , jwtProperties))
                 .addFilter(new JwtAuthorizationFilter(authenticationManager, memberRepository, jwtProperties, stringRedisTemplate))
@@ -100,7 +100,12 @@ public class SecurityConfig {
                                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                                 //결제 테스트를 위해 임시로 허용
-                                .requestMatchers("/api/orders/**", "/api/payment/**").permitAll()
+//                                .requestMatchers("/api/orders/**", "/api/payment/**").permitAll()
+                                // 결제 때문에 변경
+                                .requestMatchers("/api/payment/webhook").permitAll()
+                                .requestMatchers("/api/payment/refund").hasRole("ADMIN")
+                                .requestMatchers("/api/orders/**").authenticated()
+                                .requestMatchers("/api/payment/**").authenticated()
 
                                 .requestMatchers("/api/auth/refresh", "/css/**", "/js/**", "/images/**",
                                         "/join", "/api/join", "/api/non-member/**","/static/**",
