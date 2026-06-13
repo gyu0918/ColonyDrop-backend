@@ -103,7 +103,7 @@ public class SecurityConfig {
 //                                .requestMatchers("/api/orders/**", "/api/payment/**").permitAll()
                                 // 결제 때문에 변경
                                 .requestMatchers("/api/payment/webhook").permitAll()
-                                .requestMatchers("/api/payment/refund").hasRole("ADMIN")
+                                .requestMatchers("/api/payment/refund").authenticated()
                                 .requestMatchers("/api/orders/**").authenticated()
                                 .requestMatchers("/api/payment/**").authenticated()
 
