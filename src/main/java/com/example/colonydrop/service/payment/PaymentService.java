@@ -913,11 +913,12 @@ public class PaymentService {
                         .build();
                 try (okhttp3.Response resp = client.newCall(request).execute()) {
                     String body = resp.body().string();
-                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                    mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-                    com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(body);
-                    if (node.get("code").asInt() == 0) {
-                        return mapper.treeToValue(node.get("response"), Payment.class);
+                    // ✅ 변경: Payment 클래스가 Gson @SerializedName 기반이라
+                    //          Jackson 대신 Gson으로 파싱해야 imp_uid 등이 정상 매핑됨
+                    com.google.gson.JsonObject node = com.google.gson.JsonParser.parseString(body).getAsJsonObject();
+                    if (node.get("code").getAsInt() == 0) {
+                        com.google.gson.Gson gson = new com.google.gson.Gson();
+                        return gson.fromJson(node.get("response"), Payment.class);
                     }
                 }
             }
@@ -925,4 +926,33 @@ public class PaymentService {
         }
         return null;
     }
+//    // imp_uid 먼저 시도, 404면 merchant_uid로 재시도
+//    private Payment getPaymentWithRetry(String impUid, String merchantUid) throws Exception {
+//        try {
+//            // imp_uid로 먼저 시도
+//            Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
+//            if (payment != null) return payment;
+//        } catch (com.siot.IamportRestClient.exception.IamportResponseException e) {
+//            if (e.getHttpStatusCode() == 404) {
+//                log.warn("imp_uid 404, merchant_uid로 즉시 조회: {}", merchantUid);
+//                String token = iamportClient.getAuth().getResponse().getToken();
+//                okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+//                okhttp3.Request request = new okhttp3.Request.Builder()
+//                        .url("https://api.iamport.kr/payments/find/" + merchantUid)
+//                        .header("Authorization", token)
+//                        .build();
+//                try (okhttp3.Response resp = client.newCall(request).execute()) {
+//                    String body = resp.body().string();
+//                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+//                    mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+//                    com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(body);
+//                    if (node.get("code").asInt() == 0) {
+//                        return mapper.treeToValue(node.get("response"), Payment.class);
+//                    }
+//                }
+//            }
+//            throw e;
+//        }
+//        return null;
+//    }
 }
