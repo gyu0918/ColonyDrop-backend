@@ -104,6 +104,7 @@ public class RefreshTokenController {
                 .withClaim("memberName", java.net.URLEncoder.encode(
                         memberName != null ? memberName : "",
                         java.nio.charset.StandardCharsets.UTF_8))
+                .withClaim("roles", member.getRoles())   // ✅ 추가
                 .sign(Algorithm.HMAC512(jwtProperties.getSecret()));
 
         //    3-2	(선택) refreshToken도 재발급 후 Redis 갱신
