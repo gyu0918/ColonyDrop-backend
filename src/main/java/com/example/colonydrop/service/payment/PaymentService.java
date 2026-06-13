@@ -579,6 +579,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -712,6 +713,14 @@ public class PaymentService {
             throw new IllegalArgumentException("본인 주문만 환불 가능합니다.");
         }
 
+        // 결제 직후 환불 방지 (관리자는 제외)
+        if (!isAdmin && order.getPaidAt() != null) {
+            long secondsSincePaid = ChronoUnit.SECONDS.between(order.getPaidAt(), LocalDateTime.now());
+            if (secondsSincePaid < 15) {
+                throw new IllegalStateException("REFUND_TOO_SOON:" + (15 - secondsSincePaid));
+            }
+        }
+
         // ✅ 배송중/배송완료 상태면 환불 불가
         if ("SHIPPING".equals(order.getStatus())) {
             throw new IllegalArgumentException("배송 중인 주문은 환불이 불가합니다.");
@@ -737,7 +746,11 @@ public class PaymentService {
                 paymentRefundRequest.getRefundAmount()
         );
         cancelData.setReason(paymentRefundRequest.getRefundReason());
-        iamportClient.cancelPaymentByImpUid(cancelData);
+        com.siot.IamportRestClient.response.IamportResponse<Payment> cancelResponse =
+                iamportClient.cancelPaymentByImpUid(cancelData);
+        if (cancelResponse.getCode() != 0) {
+            throw new IllegalStateException("환불 처리 실패: " + cancelResponse.getMessage());
+        }
 
         order.setRefundedAmount(
                 order.getRefundedAmount().add(paymentRefundRequest.getRefundAmount())
