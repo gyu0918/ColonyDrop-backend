@@ -657,6 +657,13 @@ public class PaymentService {
                 cancelPaidPayment(payment.getImpUid(), "재고 확인 지연으로 인한 취소");
                 throw new IllegalStateException("주문 처리가 지연되었습니다. 다시 시도해주세요.");
             }
+            // ✅ 추가: 락 안에서 최신 order 상태 확인
+            String freshOrderStatus = orderRepository.findStatusById(order.getId());
+            if (!"PENDING".equals(freshOrderStatus)) {
+                // 이미 webhook이 PAID 처리했거나, 이미 CANCELLED(품절) 처리됨
+                log.info("verify: 이미 처리된 주문(최신상태={}), 무시: {}", freshOrderStatus, paymentVerifyRequest.getMerchantUid());
+                return; // 성공으로 처리 (프론트에 "결제 완료" 응답)
+            }
 
             // 락 안에서 DB에 조건부 UPDATE 시도 (SALE → SOLD, 영향row=1이면 성공)
             int updated = itemRepository.markAsSoldIfAvailable(itemId);
@@ -794,10 +801,17 @@ public class PaymentService {
                 throw new IllegalStateException("웹훅 처리 지연");
             }
 
-            // 락 진입 후 상태 재확인 (verify가 먼저 처리했을 수 있음)
-            if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
-                log.info("웹훅: 이미 처리됨, 무시: {}", merchantUid);
-                return;
+//            // 락 진입 후 상태 재확인 (verify가 먼저 처리했을 수 있음)
+//            if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
+//                log.info("웹훅: 이미 처리됨, 무시: {}", merchantUid);
+//                return;
+//            }
+
+            // ✅ 변경: 락 안에서 최신 order 상태 확인
+            String freshOrderStatus = orderRepository.findStatusById(order.getId());
+            if (!"PENDING".equals(freshOrderStatus)) {
+                log.info("웹훅: 이미 처리된 주문(최신상태={}), 무시: {}", freshOrderStatus, merchantUid);
+                return; // PAID면 verify가 이미 처리함, CANCELLED면 이미 환불됨 → 둘 다 추가 작업 불필요
             }
 
             // 락 안에서 DB에 조건부 UPDATE 시도 (SALE → SOLD, 영향row=1이면 성공)

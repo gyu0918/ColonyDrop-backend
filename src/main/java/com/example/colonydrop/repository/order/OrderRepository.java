@@ -66,4 +66,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "WHERE o.buyer.memberId = :memberId " +
             "AND o.status IN ('PENDING', 'RESERVED', 'PAID', 'SHIPPING', 'DELIVERED')")
     boolean existsActiveOrderByMemberId(@Param("memberId") String memberId);
+
+
+    //verify 와 웹훅사이 동시성 떄문에 추가
+    @Query("SELECT o.status FROM Order o WHERE o.id = :orderId")
+    String findStatusById(@Param("orderId") Long orderId);
 }

@@ -17,6 +17,7 @@ public class ChatMessageDto {
         GUNDAM, OPENRUN, SHARING, FREE
     }
     private String senderId;
+    private String senderName;
     private RoomType roomType;
     private String content;
     private String time;

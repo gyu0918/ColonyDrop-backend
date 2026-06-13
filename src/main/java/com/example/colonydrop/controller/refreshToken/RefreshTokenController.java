@@ -79,7 +79,9 @@ public class RefreshTokenController {
 
         String memberId = jwt.getClaim("memberId").asString();
         //마이페이지쪽 소셜로그인 구별 위해서
-        String provider = memberRepository.findByMemberId(memberId).getProvider();
+        var member = memberRepository.findByMemberId(memberId);
+        String provider = member.getProvider();
+        String memberName = member.getMemberName();
 
         System.out.println("memberId = " + memberId);
         //    2-2	Redis에서 해당 유저의 토큰과 일치하는지 확인
@@ -99,6 +101,9 @@ public class RefreshTokenController {
                 .withExpiresAt(new Date(System.currentTimeMillis() + (jwtProperties.getExpirationTime())))  //토큰 만료시간 60000 기준 1분
                 .withClaim("memberId", memberId)
                 .withClaim("provider", provider)
+                .withClaim("memberName", java.net.URLEncoder.encode(
+                        memberName != null ? memberName : "",
+                        java.nio.charset.StandardCharsets.UTF_8))
                 .sign(Algorithm.HMAC512(jwtProperties.getSecret()));
 
         //    3-2	(선택) refreshToken도 재발급 후 Redis 갱신
