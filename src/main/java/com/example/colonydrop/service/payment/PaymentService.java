@@ -598,7 +598,7 @@ public class PaymentService {
     private final RedissonClient redissonClient;   //  분산락용 추가
     private final ItemRepository itemRepository;   // ✅ 추가 - 조건부 UPDATE용
 
-    @Transactional
+    @Transactional(noRollbackFor = IllegalStateException.class)
     public void verifyPayment(PaymentVerifyRequest paymentVerifyRequest) throws Exception {
 
         log.info("verify impUid: {}", paymentVerifyRequest.getImpUid());
