@@ -653,42 +653,44 @@ public class PaymentService {
         RLock lock = redissonClient.getLock(lockKey);
 
         boolean isLocked = false;
+        String cancelImpUid = null;
+        String cancelReason = null;
+        boolean isSoldOut = false;
+        boolean isLockTimeout = false;
+
         try {
             isLocked = lock.tryLock(5, 3, TimeUnit.SECONDS);
             if (!isLocked) {
-                // 락 획득 실패 → 결제 취소 후 에러
-                cancelPaidPayment(payment.getImpUid(), "재고 확인 지연으로 인한 취소");
-                throw new IllegalStateException("주문 처리가 지연되었습니다. 다시 시도해주세요.");
-            }
-            // ✅ 추가: 락 안에서 최신 order 상태 확인
-            String freshOrderStatus = orderRepository.findStatusById(order.getId());
-            if (!"PENDING".equals(freshOrderStatus)) {
-                // 이미 webhook이 PAID 처리했거나, 이미 CANCELLED(품절) 처리됨
-                log.info("verify: 이미 처리된 주문(최신상태={}), 무시: {}", freshOrderStatus, paymentVerifyRequest.getMerchantUid());
-                return; // 성공으로 처리 (프론트에 "결제 완료" 응답)
-            }
-
-            // 락 안에서 DB에 조건부 UPDATE 시도 (SALE → SOLD, 영향row=1이면 성공)
-            int updated = itemRepository.markAsSoldIfAvailable(itemId);
-
-            // 이미 팔렸으면 → 방금 한 결제를 취소(환불)하고 품절 처리
-            if (updated == 0) {
-                log.info("verify 재고 없음(이미 품절): itemId={}", itemId);
-                cancelPaidPayment(payment.getImpUid(), "재고 소진으로 인한 자동 취소");
+                cancelImpUid = payment.getImpUid();
+                cancelReason = "재고 확인 지연으로 인한 취소";
+                isLockTimeout = true;
                 order.setStatus("CANCELLED");
                 orderRepository.save(order);
-                throw new IllegalStateException("SOLD_OUT"); // 프론트에서 품절 메시지로 처리
+            } else {
+                String freshOrderStatus = orderRepository.findStatusById(order.getId());
+                if (!"PENDING".equals(freshOrderStatus)) {
+                    log.info("verify: 이미 처리된 주문(최신상태={}), 무시: {}", freshOrderStatus, paymentVerifyRequest.getMerchantUid());
+                    return;
+                }
+
+                int updated = itemRepository.markAsSoldIfAvailable(itemId);
+
+                if (updated == 0) {
+                    log.info("verify 재고 없음(이미 품절): itemId={}", itemId);
+                    cancelImpUid = payment.getImpUid();
+                    cancelReason = "재고 소진으로 인한 자동 취소";
+                    isSoldOut = true;
+                    order.setStatus("CANCELLED");
+                    orderRepository.save(order);
+                } else {
+                    order.setImpUid(payment.getImpUid());
+                    order.setStatus("PAID");
+                    order.setPaidAt(LocalDateTime.now());
+                    order.getItem().setStatus("SOLD");
+                    orderRepository.save(order);
+                    log.info("verify 결제 완료 처리: {}", paymentVerifyRequest.getMerchantUid());
+                }
             }
-
-            // 재고 있음 → PAID 처리 + 상품 SOLD
-            order.setImpUid(payment.getImpUid());
-            order.setStatus("PAID");
-            order.setPaidAt(LocalDateTime.now());
-            order.getItem().setStatus("SOLD"); // 메모리상 엔티티도 동기화 (DB는 위 UPDATE에서 이미 변경됨)
-            orderRepository.save(order);
-
-            log.info("verify 결제 완료 처리: {}", paymentVerifyRequest.getMerchantUid());
-
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("결제 처리 중 오류가 발생했습니다.");
@@ -696,6 +698,18 @@ public class PaymentService {
             if (isLocked && lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
+        }
+
+        // 락 해제 후 포트원 취소 호출
+        if (cancelImpUid != null) {
+            cancelPaidPayment(cancelImpUid, cancelReason);
+        }
+
+        if (isLockTimeout) {
+            throw new IllegalStateException("주문 처리가 지연되었습니다. 다시 시도해주세요.");
+        }
+        if (isSoldOut) {
+            throw new IllegalStateException("SOLD_OUT");
         }
     }
 
@@ -818,46 +832,43 @@ public class PaymentService {
         RLock lock = redissonClient.getLock(lockKey);
 
         boolean isLocked = false;
+        String cancelImpUid = null;
+        String cancelReason = null;
+        boolean isSoldOut = false;
+
         try {
             isLocked = lock.tryLock(5, 3, TimeUnit.SECONDS);
             if (!isLocked) {
-                throw new IllegalStateException("웹훅 처리 지연");
-            }
-
-//            // 락 진입 후 상태 재확인 (verify가 먼저 처리했을 수 있음)
-//            if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
-//                log.info("웹훅: 이미 처리됨, 무시: {}", merchantUid);
-//                return;
-//            }
-
-            // ✅ 변경: 락 안에서 최신 order 상태 확인
-            String freshOrderStatus = orderRepository.findStatusById(order.getId());
-            if (!"PENDING".equals(freshOrderStatus)) {
-                log.info("웹훅: 이미 처리된 주문(최신상태={}), 무시: {}", freshOrderStatus, merchantUid);
-                return; // PAID면 verify가 이미 처리함, CANCELLED면 이미 환불됨 → 둘 다 추가 작업 불필요
-            }
-
-            // 락 안에서 DB에 조건부 UPDATE 시도 (SALE → SOLD, 영향row=1이면 성공)
-            int updated = itemRepository.markAsSoldIfAvailable(itemId);
-
-            // 이미 품절 → 방금 결제 취소
-            if (updated == 0) {
-                log.info("웹훅 재고 없음(이미 품절): itemId={}", itemId);
-                cancelPaidPayment(impUid, "재고 소진으로 인한 자동 취소 (웹훅)");
+                cancelImpUid = impUid;
+                cancelReason = "재고 확인 지연으로 인한 취소 (웹훅)";
+                isSoldOut = true;
                 order.setStatus("CANCELLED");
                 orderRepository.save(order);
-                return;
+            } else {
+                String freshOrderStatus = orderRepository.findStatusById(order.getId());
+                if (!"PENDING".equals(freshOrderStatus)) {
+                    log.info("웹훅: 이미 처리된 주문(최신상태={}), 무시: {}", freshOrderStatus, merchantUid);
+                    return;
+                }
+
+                int updated = itemRepository.markAsSoldIfAvailable(itemId);
+
+                if (updated == 0) {
+                    log.info("웹훅 재고 없음(이미 품절): itemId={}", itemId);
+                    cancelImpUid = impUid;
+                    cancelReason = "재고 소진으로 인한 자동 취소 (웹훅)";
+                    isSoldOut = true;
+                    order.setStatus("CANCELLED");
+                    orderRepository.save(order);
+                } else {
+                    order.setImpUid(impUid);
+                    order.setStatus("PAID");
+                    order.setPaidAt(LocalDateTime.now());
+                    order.getItem().setStatus("SOLD");
+                    orderRepository.save(order);
+                    log.info("웹훅으로 결제 완료 처리: {}", merchantUid);
+                }
             }
-
-            // 재고 있음 → PAID 처리
-            order.setImpUid(impUid);
-            order.setStatus("PAID");
-            order.setPaidAt(LocalDateTime.now());
-            order.getItem().setStatus("SOLD"); // 메모리상 엔티티도 동기화
-            orderRepository.save(order);
-
-            log.info("웹훅으로 결제 완료 처리: {}", merchantUid);
-
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("웹훅 처리 중 오류가 발생했습니다.");
@@ -865,6 +876,11 @@ public class PaymentService {
             if (isLocked && lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
+        }
+
+        // 락 해제 후 포트원 취소 호출
+        if (cancelImpUid != null) {
+            cancelPaidPayment(cancelImpUid, cancelReason);
         }
     }
 
