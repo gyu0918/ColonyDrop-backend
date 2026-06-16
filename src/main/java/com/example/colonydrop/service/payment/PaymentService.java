@@ -560,6 +560,425 @@
 //    }
 //}
 
+//package com.example.colonydrop.service.payment;
+//
+//import com.example.colonydrop.dto.payment.PaymentRefundRequest;
+//import com.example.colonydrop.dto.payment.PaymentVerifyRequest;
+//import com.example.colonydrop.entity.order.Order;
+//import com.example.colonydrop.repository.item.ItemRepository;
+//import com.example.colonydrop.repository.order.OrderRepository;
+//import com.siot.IamportRestClient.IamportClient;
+//import com.siot.IamportRestClient.request.CancelData;
+//import com.siot.IamportRestClient.response.Payment;
+//import lombok.RequiredArgsConstructor;
+//import lombok.extern.slf4j.Slf4j;
+//import org.redisson.api.RLock;
+//import org.redisson.api.RedissonClient;
+//import org.springframework.stereotype.Service;
+//import org.springframework.transaction.annotation.Transactional;
+//
+//import java.math.BigDecimal;
+//import java.time.LocalDateTime;
+//import java.time.temporal.ChronoUnit;
+//import java.util.concurrent.TimeUnit;
+//
+//import com.fasterxml.jackson.databind.ObjectMapper;
+//import com.fasterxml.jackson.databind.DeserializationFeature;
+//import com.fasterxml.jackson.databind.JsonNode;
+//import org.springframework.security.core.Authentication;
+//import org.springframework.security.core.context.SecurityContextHolder;
+//
+//@Service
+//@Slf4j
+//@RequiredArgsConstructor
+//public class PaymentService {
+//
+//    private final OrderRepository orderRepository;
+//    private final IamportClient iamportClient;
+//    private final RedissonClient redissonClient;   //  분산락용 추가
+//    private final ItemRepository itemRepository;   // ✅ 추가 - 조건부 UPDATE용
+//
+//    @Transactional(noRollbackFor = IllegalStateException.class)
+//    public void verifyPayment(PaymentVerifyRequest paymentVerifyRequest) throws Exception {
+//
+//        log.info("verify impUid: {}", paymentVerifyRequest.getImpUid());
+//        log.info("verify merchantUid: {}", paymentVerifyRequest.getMerchantUid());
+//
+//        // 1. DB에서 주문 먼저 조회
+//        Order order = orderRepository.findByMerchantUid(paymentVerifyRequest.getMerchantUid())
+//                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
+//
+//        log.info("verify 주문 찾음: {}, status: {}", paymentVerifyRequest.getMerchantUid(), order.getStatus());
+//
+//        // 웹훅이 이미 PAID 처리한 경우 → 성공으로 반환
+//        if ("PAID".equals(order.getStatus())) {
+//            return;
+//        }
+//
+//        // PENDING 외 다른 상태 (CANCELLED 등) → 에러
+//        if (!"PENDING".equals(order.getStatus())) {
+//            throw new IllegalArgumentException("이미 처리된 주문입니다.");
+//        }
+//
+//        log.info("포트원 API 호출 시작");
+//        // 2. merchantUid로 포트원 API 조회 (재시도 포함)
+//        Payment payment = getPaymentWithRetry(paymentVerifyRequest.getImpUid(), paymentVerifyRequest.getMerchantUid());
+//        log.info("포트원 API 성공: {}", payment.getStatus());
+//
+//        if (payment == null) {
+//            throw new IllegalArgumentException("결제 정보가 존재하지 않습니다.");
+//        }
+//
+//        // 3. 결제 금액 검증
+//        if (payment.getAmount().compareTo(order.getTotalPrice()) != 0) {
+//            CancelData cancelData = new CancelData(paymentVerifyRequest.getImpUid(), true);
+//            cancelData.setReason("금액 위변조 감지");
+//            iamportClient.cancelPaymentByImpUid(cancelData);
+//            throw new IllegalStateException("결제 금액이 일치하지 않습니다.");
+//        }
+//
+//        // 4. 결제 상태 확인
+//        if (!"paid".equals(payment.getStatus())) {
+//            throw new IllegalArgumentException("결제 실패!!");
+//        }
+//
+//        // ===========================================================
+//        // 5. ✅ 재고 검증 + PAID 처리 (분산락 + 조건부 UPDATE로 동시성 제어)
+//        //    여러 명이 동시에 결제 완료 시, 먼저 락을 잡은 사람만 SOLD 처리.
+//        //    이미 품절이면 방금 한 결제를 자동 취소(환불)한다.
+//        //    ✅ stale read 방지: 영속성 컨텍스트 캐시 대신 DB 조건부 UPDATE로 판단
+//        // ===========================================================
+//        Long itemId = order.getItem().getId();
+//        String lockKey = "item:lock:" + itemId;
+//        RLock lock = redissonClient.getLock(lockKey);
+//
+//        boolean isLocked = false;
+//        String cancelImpUid = null;
+//        String cancelReason = null;
+//        boolean isSoldOut = false;
+//        boolean isLockTimeout = false;
+//
+//        try {
+//            isLocked = lock.tryLock(5, 3, TimeUnit.SECONDS);
+//            if (!isLocked) {
+//                cancelImpUid = payment.getImpUid();
+//                cancelReason = "재고 확인 지연으로 인한 취소";
+//                isLockTimeout = true;
+//                order.setStatus("CANCELLED");
+//                orderRepository.save(order);
+//            } else {
+//                String freshOrderStatus = orderRepository.findStatusById(order.getId());
+//                if (!"PENDING".equals(freshOrderStatus)) {
+//                    log.info("verify: 이미 처리된 주문(최신상태={}), 무시: {}", freshOrderStatus, paymentVerifyRequest.getMerchantUid());
+//                    return;
+//                }
+//
+//                int updated = itemRepository.markAsSoldIfAvailable(itemId);
+//
+//                if (updated == 0) {
+//                    log.info("verify 재고 없음(이미 품절): itemId={}", itemId);
+//                    cancelImpUid = payment.getImpUid();
+//                    cancelReason = "재고 소진으로 인한 자동 취소";
+//                    isSoldOut = true;
+//                    order.setStatus("CANCELLED");
+//                    orderRepository.save(order);
+//                } else {
+//                    order.setImpUid(payment.getImpUid());
+//                    order.setStatus("PAID");
+//                    order.setPaidAt(LocalDateTime.now());
+//                    order.getItem().setStatus("SOLD");
+//                    orderRepository.save(order);
+//                    log.info("verify 결제 완료 처리: {}", paymentVerifyRequest.getMerchantUid());
+//                }
+//            }
+//        } catch (InterruptedException e) {
+//            Thread.currentThread().interrupt();
+//            throw new IllegalStateException("결제 처리 중 오류가 발생했습니다.");
+//        } finally {
+//            if (isLocked && lock.isHeldByCurrentThread()) {
+//                lock.unlock();
+//            }
+//        }
+//
+//        // 락 해제 후 포트원 취소 호출
+//        if (cancelImpUid != null) {
+//            cancelPaidPayment(cancelImpUid, cancelReason);
+//        }
+//
+//        if (isLockTimeout) {
+//            throw new IllegalStateException("주문 처리가 지연되었습니다. 다시 시도해주세요.");
+//        }
+//        if (isSoldOut) {
+//            throw new IllegalStateException("SOLD_OUT");
+//        }
+//    }
+//
+//    @Transactional
+//    public void refundPayment(PaymentRefundRequest paymentRefundRequest) throws Exception {
+//
+//        Order order = orderRepository.findByMerchantUid(paymentRefundRequest.getMerchantUid())
+//                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을수 없습니다."));
+//
+//        // 본인 주문인지 확인 (관리자는 모든 주문 환불 가능)
+//        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+//        boolean isAdmin = auth.getAuthorities().stream()
+//                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+//        if (!isAdmin && !order.getBuyer().getMemberId().equals(auth.getName())) {
+//            throw new IllegalArgumentException("본인 주문만 환불 가능합니다.");
+//        }
+//
+//        // 결제 직후 환불 방지 (관리자는 제외)
+//        if (!isAdmin && order.getPaidAt() != null) {
+//            long secondsSincePaid = ChronoUnit.SECONDS.between(order.getPaidAt(), LocalDateTime.now());
+//            if (secondsSincePaid < 15) {
+//                throw new IllegalStateException("REFUND_TOO_SOON:" + (15 - secondsSincePaid));
+//            }
+//        }
+//
+//        // ✅ 배송중/배송완료 상태면 환불 불가
+//        if ("SHIPPING".equals(order.getStatus())) {
+//            throw new IllegalArgumentException("배송 중인 주문은 환불이 불가합니다.");
+//        }
+//        if ("DELIVERED".equals(order.getStatus())) {
+//            throw new IllegalArgumentException("배송 완료된 주문은 환불이 불가합니다.");
+//        }
+//
+//        // ✅ PAID 상태만 환불 가능
+//        if (!"PAID".equals(order.getStatus())) {
+//            throw new IllegalArgumentException("결제 완료 상태의 주문만 환불 가능합니다.");
+//        }
+//
+//        BigDecimal remainAmount = order.getTotalPrice().subtract(order.getRefundedAmount());
+//
+//        if (paymentRefundRequest.getRefundAmount().compareTo(remainAmount) > 0) {
+//            throw new IllegalStateException("환불 금액이 잔여 금액을 초과합니다.");
+//        }
+//
+//        CancelData cancelData = new CancelData(
+//                order.getImpUid(),
+//                true,
+//                paymentRefundRequest.getRefundAmount()
+//        );
+//        cancelData.setReason(paymentRefundRequest.getRefundReason());
+//        com.siot.IamportRestClient.response.IamportResponse<Payment> cancelResponse =
+//                iamportClient.cancelPaymentByImpUid(cancelData);
+//        if (cancelResponse.getCode() != 0) {
+//            throw new IllegalStateException("환불 처리 실패: " + cancelResponse.getMessage());
+//        }
+//
+//        order.setRefundedAmount(
+//                order.getRefundedAmount().add(paymentRefundRequest.getRefundAmount())
+//        );
+//
+//        if (order.getRefundedAmount().compareTo(order.getTotalPrice()) == 0) {
+//            order.setStatus("REFUNDED");
+//            order.getItem().setStatus("SALE");
+//        } else {
+//            order.setStatus("PARTIALLY_REFUNDED");
+//        }
+//
+//        orderRepository.save(order);
+//    }
+//
+//    @Transactional
+//    public void processWebhook(String impUid, String merchantUid, String status) throws Exception {
+//
+//        Order order = null;
+//        for (int i = 0; i < 3; i++) {
+//            log.info("주문 조회 시도 {}: {}", i + 1, merchantUid);
+//            order = orderRepository.findByMerchantUid(merchantUid).orElse(null);
+//            if (order != null) {
+//                log.info("주문 찾음: {}, status: {}", merchantUid, order.getStatus());
+//                break;
+//            }
+//            log.info("주문 못찾음 {}회차, 재시도...", i + 1);
+//            Thread.sleep(500);
+//        }
+//        if (order == null) {
+//            throw new IllegalArgumentException("존재하지 않는 결제정보입니다.");
+//        }
+//
+//        //프론트에서 백엔드쪽으로 verify를 보내는게 웹훅보다 빠를때 처리하는 부분
+////        if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
+////            log.info("이미 처리된 주문 웹훅 무시: {}", merchantUid);
+////            return;
+////        }
+//        // paid 웹훅: 이미 처리됐으면 무시
+//        if ("paid".equals(status)) {
+//            if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
+//                log.info("이미 처리된 주문 웹훅 무시: {}", merchantUid);
+//                return;
+//            }
+//        }
+//
+//        // cancelled 웹훅: 포트원에서 외부 취소된 경우 DB 동기화
+//        if ("cancelled".equals(status)) {
+//            if ("PAID".equals(order.getStatus())) {
+//                // 포트원 대시보드에서 수동 취소된 경우
+//                order.setStatus("REFUNDED");
+//                order.setRefundedAmount(order.getTotalPrice());
+//                order.getItem().setStatus("SALE");
+//                orderRepository.save(order);
+//                log.info("포트원 외부 취소 → DB 동기화 완료: {}", merchantUid);
+//            }
+//            return;
+//        }
+//
+//        //웹훅으로 온 포트원 결제 정보 관련
+//        if (!"paid".equals(status)) {
+//            log.info("결제 미완료 웹훅 무시: {}, status: {}", merchantUid, status);
+//            return;
+//        }
+//
+//        // merchantUid로 포트원 API 조회 (재시도 포함)
+//        Payment payment = getPaymentWithRetry(impUid, merchantUid);
+//        if (payment == null) {
+//            throw new IllegalArgumentException("포트원에서 결제 정보를 찾을 수 없습니다.");
+//        }
+//
+//        if (payment.getAmount().compareTo(order.getTotalPrice()) != 0) {
+//            CancelData cancelData = new CancelData(impUid, true);
+//            cancelData.setReason("금액 위변조 감지 (웹훅)");
+//            iamportClient.cancelPaymentByImpUid(cancelData);
+//            throw new IllegalStateException("결제 금액 불일치 - 자동 취소됨");
+//        }
+//
+//        // ===========================================================
+//        // ✅ 웹훅도 동일하게 재고 검증 (분산락 + 조건부 UPDATE)
+//        //    verify를 못 보낸 경우(창 꺼짐 등) 웹훅이 백업으로 처리.
+//        //    verify와 동시에 들어와도 같은 락을 공유하므로 안전.
+//        //    ✅ stale read 방지: DB 조건부 UPDATE로 판단
+//        // ===========================================================
+//        Long itemId = order.getItem().getId();
+//        String lockKey = "item:lock:" + itemId;
+//        RLock lock = redissonClient.getLock(lockKey);
+//
+//        boolean isLocked = false;
+//        String cancelImpUid = null;
+//        String cancelReason = null;
+//        boolean isSoldOut = false;
+//
+//        try {
+//            isLocked = lock.tryLock(5, 3, TimeUnit.SECONDS);
+//            if (!isLocked) {
+//                cancelImpUid = impUid;
+//                cancelReason = "재고 확인 지연으로 인한 취소 (웹훅)";
+//                isSoldOut = true;
+//                order.setStatus("CANCELLED");
+//                orderRepository.save(order);
+//            } else {
+//                String freshOrderStatus = orderRepository.findStatusById(order.getId());
+//                if (!"PENDING".equals(freshOrderStatus)) {
+//                    log.info("웹훅: 이미 처리된 주문(최신상태={}), 무시: {}", freshOrderStatus, merchantUid);
+//                    return;
+//                }
+//
+//                int updated = itemRepository.markAsSoldIfAvailable(itemId);
+//
+//                if (updated == 0) {
+//                    log.info("웹훅 재고 없음(이미 품절): itemId={}", itemId);
+//                    cancelImpUid = impUid;
+//                    cancelReason = "재고 소진으로 인한 자동 취소 (웹훅)";
+//                    isSoldOut = true;
+//                    order.setStatus("CANCELLED");
+//                    orderRepository.save(order);
+//                } else {
+//                    order.setImpUid(impUid);
+//                    order.setStatus("PAID");
+//                    order.setPaidAt(LocalDateTime.now());
+//                    order.getItem().setStatus("SOLD");
+//                    orderRepository.save(order);
+//                    log.info("웹훅으로 결제 완료 처리: {}", merchantUid);
+//                }
+//            }
+//        } catch (InterruptedException e) {
+//            Thread.currentThread().interrupt();
+//            throw new IllegalStateException("웹훅 처리 중 오류가 발생했습니다.");
+//        } finally {
+//            if (isLocked && lock.isHeldByCurrentThread()) {
+//                lock.unlock();
+//            }
+//        }
+//
+//        // 락 해제 후 포트원 취소 호출
+//        if (cancelImpUid != null) {
+//            cancelPaidPayment(cancelImpUid, cancelReason);
+//        }
+//    }
+//
+//    // ✅ 결제 취소(환불) 헬퍼 - 품절 시 방금 결제한 돈을 돌려줌
+//    private void cancelPaidPayment(String impUid, String reason) {
+//        try {
+//            CancelData cancelData = new CancelData(impUid, true);
+//            cancelData.setReason(reason);
+//            iamportClient.cancelPaymentByImpUid(cancelData);
+//            log.info("결제 자동 취소 완료: impUid={}, reason={}", impUid, reason);
+//        } catch (Exception e) {
+//            log.error("결제 자동 취소 실패: impUid={}, error={}", impUid, e.getMessage());
+//        }
+//    }
+//
+//    // imp_uid 먼저 시도, 404면 merchant_uid로 재시도
+//    private Payment getPaymentWithRetry(String impUid, String merchantUid) throws Exception {
+//        try {
+//            // imp_uid로 먼저 시도
+//            Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
+//            if (payment != null) return payment;
+//        } catch (com.siot.IamportRestClient.exception.IamportResponseException e) {
+//            if (e.getHttpStatusCode() == 404) {
+//                log.warn("imp_uid 404, merchant_uid로 즉시 조회: {}", merchantUid);
+//                String token = iamportClient.getAuth().getResponse().getToken();
+//                okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+//                okhttp3.Request request = new okhttp3.Request.Builder()
+//                        .url("https://api.iamport.kr/payments/find/" + merchantUid)
+//                        .header("Authorization", token)
+//                        .build();
+//                try (okhttp3.Response resp = client.newCall(request).execute()) {
+//                    String body = resp.body().string();
+//                    // ✅ 변경: Payment 클래스가 Gson @SerializedName 기반이라
+//                    //          Jackson 대신 Gson으로 파싱해야 imp_uid 등이 정상 매핑됨
+//                    com.google.gson.JsonObject node = com.google.gson.JsonParser.parseString(body).getAsJsonObject();
+//                    if (node.get("code").getAsInt() == 0) {
+//                        com.google.gson.Gson gson = new com.google.gson.Gson();
+//                        return gson.fromJson(node.get("response"), Payment.class);
+//                    }
+//                }
+//            }
+//            throw e;
+//        }
+//        return null;
+//    }
+////    // imp_uid 먼저 시도, 404면 merchant_uid로 재시도
+////    private Payment getPaymentWithRetry(String impUid, String merchantUid) throws Exception {
+////        try {
+////            // imp_uid로 먼저 시도
+////            Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
+////            if (payment != null) return payment;
+////        } catch (com.siot.IamportRestClient.exception.IamportResponseException e) {
+////            if (e.getHttpStatusCode() == 404) {
+////                log.warn("imp_uid 404, merchant_uid로 즉시 조회: {}", merchantUid);
+////                String token = iamportClient.getAuth().getResponse().getToken();
+////                okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+////                okhttp3.Request request = new okhttp3.Request.Builder()
+////                        .url("https://api.iamport.kr/payments/find/" + merchantUid)
+////                        .header("Authorization", token)
+////                        .build();
+////                try (okhttp3.Response resp = client.newCall(request).execute()) {
+////                    String body = resp.body().string();
+////                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+////                    mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+////                    com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(body);
+////                    if (node.get("code").asInt() == 0) {
+////                        return mapper.treeToValue(node.get("response"), Payment.class);
+////                    }
+////                }
+////            }
+////            throw e;
+////        }
+////        return null;
+////    }
+//}
+
 package com.example.colonydrop.service.payment;
 
 import com.example.colonydrop.dto.payment.PaymentRefundRequest;
@@ -582,9 +1001,6 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -595,16 +1011,19 @@ public class PaymentService {
 
     private final OrderRepository orderRepository;
     private final IamportClient iamportClient;
-    private final RedissonClient redissonClient;   //  분산락용 추가
-    private final ItemRepository itemRepository;   // ✅ 추가 - 조건부 UPDATE용
+    private final RedissonClient redissonClient;
+    private final ItemRepository itemRepository;
 
+    // ================================================================
+    // 1. verifyPayment - 프론트에서 결제 완료 후 호출
+    // ================================================================
     @Transactional(noRollbackFor = IllegalStateException.class)
     public void verifyPayment(PaymentVerifyRequest paymentVerifyRequest) throws Exception {
 
         log.info("verify impUid: {}", paymentVerifyRequest.getImpUid());
         log.info("verify merchantUid: {}", paymentVerifyRequest.getMerchantUid());
 
-        // 1. DB에서 주문 먼저 조회
+        // 1. 주문 조회
         Order order = orderRepository.findByMerchantUid(paymentVerifyRequest.getMerchantUid())
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
 
@@ -615,13 +1034,13 @@ public class PaymentService {
             return;
         }
 
-        // PENDING 외 다른 상태 (CANCELLED 등) → 에러
+        // PENDING 외 다른 상태 → 에러
         if (!"PENDING".equals(order.getStatus())) {
             throw new IllegalArgumentException("이미 처리된 주문입니다.");
         }
 
+        // 2. 포트원 API 조회
         log.info("포트원 API 호출 시작");
-        // 2. merchantUid로 포트원 API 조회 (재시도 포함)
         Payment payment = getPaymentWithRetry(paymentVerifyRequest.getImpUid(), paymentVerifyRequest.getMerchantUid());
         log.info("포트원 API 성공: {}", payment.getStatus());
 
@@ -643,10 +1062,9 @@ public class PaymentService {
         }
 
         // ===========================================================
-        // 5. ✅ 재고 검증 + PAID 처리 (분산락 + 조건부 UPDATE로 동시성 제어)
-        //    여러 명이 동시에 결제 완료 시, 먼저 락을 잡은 사람만 SOLD 처리.
-        //    이미 품절이면 방금 한 결제를 자동 취소(환불)한다.
-        //    ✅ stale read 방지: 영속성 컨텍스트 캐시 대신 DB 조건부 UPDATE로 판단
+        // 5. 재고 검증 + PAID 처리 (분산락 + 조건부 UPDATE)
+        //    ✅ stale read 방지: DB 조건부 UPDATE로 판단
+        //    ✅ verify/webhook 동시 처리 방지: 분산락으로 직렬화
         // ===========================================================
         Long itemId = order.getItem().getId();
         String lockKey = "item:lock:" + itemId;
@@ -713,6 +1131,11 @@ public class PaymentService {
         }
     }
 
+    // ================================================================
+    // 2. refundPayment - 사용자가 직접 환불신청 버튼 클릭 시 호출
+    //    ✅ 포트원이 이미 자동환불했어도 (테스트 모드 11:11 환불)
+    //       400 에러를 무시하고 DB만 REFUNDED + SALE로 업데이트
+    // ================================================================
     @Transactional
     public void refundPayment(PaymentRefundRequest paymentRefundRequest) throws Exception {
 
@@ -735,7 +1158,7 @@ public class PaymentService {
             }
         }
 
-        // ✅ 배송중/배송완료 상태면 환불 불가
+        // 배송중/배송완료 상태면 환불 불가
         if ("SHIPPING".equals(order.getStatus())) {
             throw new IllegalArgumentException("배송 중인 주문은 환불이 불가합니다.");
         }
@@ -743,43 +1166,63 @@ public class PaymentService {
             throw new IllegalArgumentException("배송 완료된 주문은 환불이 불가합니다.");
         }
 
-        // ✅ PAID 상태만 환불 가능
+        // PAID 상태만 환불 가능
         if (!"PAID".equals(order.getStatus())) {
             throw new IllegalArgumentException("결제 완료 상태의 주문만 환불 가능합니다.");
         }
 
         BigDecimal remainAmount = order.getTotalPrice().subtract(order.getRefundedAmount());
-
         if (paymentRefundRequest.getRefundAmount().compareTo(remainAmount) > 0) {
             throw new IllegalStateException("환불 금액이 잔여 금액을 초과합니다.");
         }
 
+        // ✅ 포트원 cancel API 호출
+        //    성공: 포트원에서 환불 처리 후 DB 업데이트
+        //    실패(400): 포트원 테스트 모드 11:11 자동환불로 이미 취소됨
+        //               → 돈은 이미 돌아갔으니 DB만 업데이트하고 계속 진행
         CancelData cancelData = new CancelData(
                 order.getImpUid(),
                 true,
                 paymentRefundRequest.getRefundAmount()
         );
         cancelData.setReason(paymentRefundRequest.getRefundReason());
-        com.siot.IamportRestClient.response.IamportResponse<Payment> cancelResponse =
-                iamportClient.cancelPaymentByImpUid(cancelData);
-        if (cancelResponse.getCode() != 0) {
-            throw new IllegalStateException("환불 처리 실패: " + cancelResponse.getMessage());
+
+        try {
+            com.siot.IamportRestClient.response.IamportResponse<Payment> cancelResponse =
+                    iamportClient.cancelPaymentByImpUid(cancelData);
+            if (cancelResponse.getCode() != 0) {
+                log.warn("포트원 cancel API 실패 (이미 취소됐을 수 있음): {}", cancelResponse.getMessage());
+                // 에러 던지지 않고 DB만 업데이트 진행
+            } else {
+                log.info("포트원 환불 성공: impUid={}", order.getImpUid());
+            }
+        } catch (Exception e) {
+            // 400 등 이미 취소된 경우 → 무시하고 DB만 업데이트
+            log.warn("포트원 cancel API 에러 (이미 취소됐을 수 있음, DB만 업데이트): {}", e.getMessage());
         }
 
+        // 포트원 결과와 무관하게 DB는 항상 업데이트
         order.setRefundedAmount(
                 order.getRefundedAmount().add(paymentRefundRequest.getRefundAmount())
         );
 
         if (order.getRefundedAmount().compareTo(order.getTotalPrice()) == 0) {
             order.setStatus("REFUNDED");
-            order.getItem().setStatus("SALE");
+            order.getItem().setStatus("SALE"); // ✅ 상품 다시 구매 가능
         } else {
             order.setStatus("PARTIALLY_REFUNDED");
         }
 
         orderRepository.save(order);
+        log.info("환불 처리 완료: merchantUid={}, status={}", paymentRefundRequest.getMerchantUid(), order.getStatus());
     }
 
+    // ================================================================
+    // 3. processWebhook - 포트원이 백엔드로 직접 호출
+    //    ✅ paid 웹훅: 결제 완료 처리 (verify 백업)
+    //    ✅ cancelled 웹훅: DB 변경 없이 무시
+    //       → 사용자가 직접 환불신청해야만 DB가 REFUNDED로 변경됨
+    // ================================================================
     @Transactional
     public void processWebhook(String impUid, String merchantUid, String status) throws Exception {
 
@@ -798,17 +1241,29 @@ public class PaymentService {
             throw new IllegalArgumentException("존재하지 않는 결제정보입니다.");
         }
 
-        if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
-            log.info("이미 처리된 주문 웹훅 무시: {}", merchantUid);
+        // ✅ cancelled 웹훅: DB 변경 없이 무시
+        //    포트원 테스트 모드 11:11 자동환불 또는 대시보드 수동 취소
+        //    → 사용자가 환불신청 버튼을 눌러야만 DB가 REFUNDED로 변경됨
+        if ("cancelled".equals(status)) {
+            log.info("cancelled 웹훅 수신 → DB 변경 없이 무시 (사용자 환불신청 필요): {}", merchantUid);
             return;
         }
 
+        // ✅ paid 웹훅: 이미 처리됐으면 무시 (멱등성)
+        if ("paid".equals(status)) {
+            if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
+                log.info("이미 처리된 주문 웹훅 무시: {}", merchantUid);
+                return;
+            }
+        }
+
+        // paid 외 다른 상태 웹훅 무시
         if (!"paid".equals(status)) {
             log.info("결제 미완료 웹훅 무시: {}, status: {}", merchantUid, status);
             return;
         }
 
-        // merchantUid로 포트원 API 조회 (재시도 포함)
+        // 포트원 API 조회
         Payment payment = getPaymentWithRetry(impUid, merchantUid);
         if (payment == null) {
             throw new IllegalArgumentException("포트원에서 결제 정보를 찾을 수 없습니다.");
@@ -822,10 +1277,9 @@ public class PaymentService {
         }
 
         // ===========================================================
-        // ✅ 웹훅도 동일하게 재고 검증 (분산락 + 조건부 UPDATE)
-        //    verify를 못 보낸 경우(창 꺼짐 등) 웹훅이 백업으로 처리.
-        //    verify와 동시에 들어와도 같은 락을 공유하므로 안전.
-        //    ✅ stale read 방지: DB 조건부 UPDATE로 판단
+        // 웹훅 재고 검증 (분산락 + 조건부 UPDATE)
+        //    ✅ verify를 못 보낸 경우(창 꺼짐 등) 웹훅이 백업으로 처리
+        //    ✅ verify와 동시에 들어와도 같은 락 공유로 안전
         // ===========================================================
         Long itemId = order.getItem().getId();
         String lockKey = "item:lock:" + itemId;
@@ -834,14 +1288,12 @@ public class PaymentService {
         boolean isLocked = false;
         String cancelImpUid = null;
         String cancelReason = null;
-        boolean isSoldOut = false;
 
         try {
             isLocked = lock.tryLock(5, 3, TimeUnit.SECONDS);
             if (!isLocked) {
                 cancelImpUid = impUid;
                 cancelReason = "재고 확인 지연으로 인한 취소 (웹훅)";
-                isSoldOut = true;
                 order.setStatus("CANCELLED");
                 orderRepository.save(order);
             } else {
@@ -857,7 +1309,6 @@ public class PaymentService {
                     log.info("웹훅 재고 없음(이미 품절): itemId={}", itemId);
                     cancelImpUid = impUid;
                     cancelReason = "재고 소진으로 인한 자동 취소 (웹훅)";
-                    isSoldOut = true;
                     order.setStatus("CANCELLED");
                     orderRepository.save(order);
                 } else {
@@ -884,7 +1335,11 @@ public class PaymentService {
         }
     }
 
-    // ✅ 결제 취소(환불) 헬퍼 - 품절 시 방금 결제한 돈을 돌려줌
+    // ================================================================
+    // 헬퍼 메서드
+    // ================================================================
+
+    // 품절 시 방금 결제한 돈 자동 환불
     private void cancelPaidPayment(String impUid, String reason) {
         try {
             CancelData cancelData = new CancelData(impUid, true);
@@ -899,7 +1354,6 @@ public class PaymentService {
     // imp_uid 먼저 시도, 404면 merchant_uid로 재시도
     private Payment getPaymentWithRetry(String impUid, String merchantUid) throws Exception {
         try {
-            // imp_uid로 먼저 시도
             Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
             if (payment != null) return payment;
         } catch (com.siot.IamportRestClient.exception.IamportResponseException e) {
@@ -913,8 +1367,7 @@ public class PaymentService {
                         .build();
                 try (okhttp3.Response resp = client.newCall(request).execute()) {
                     String body = resp.body().string();
-                    // ✅ 변경: Payment 클래스가 Gson @SerializedName 기반이라
-                    //          Jackson 대신 Gson으로 파싱해야 imp_uid 등이 정상 매핑됨
+                    // ✅ Payment 클래스가 Gson @SerializedName 기반이라 Gson으로 파싱
                     com.google.gson.JsonObject node = com.google.gson.JsonParser.parseString(body).getAsJsonObject();
                     if (node.get("code").getAsInt() == 0) {
                         com.google.gson.Gson gson = new com.google.gson.Gson();
@@ -926,33 +1379,4 @@ public class PaymentService {
         }
         return null;
     }
-//    // imp_uid 먼저 시도, 404면 merchant_uid로 재시도
-//    private Payment getPaymentWithRetry(String impUid, String merchantUid) throws Exception {
-//        try {
-//            // imp_uid로 먼저 시도
-//            Payment payment = iamportClient.paymentByImpUid(impUid).getResponse();
-//            if (payment != null) return payment;
-//        } catch (com.siot.IamportRestClient.exception.IamportResponseException e) {
-//            if (e.getHttpStatusCode() == 404) {
-//                log.warn("imp_uid 404, merchant_uid로 즉시 조회: {}", merchantUid);
-//                String token = iamportClient.getAuth().getResponse().getToken();
-//                okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
-//                okhttp3.Request request = new okhttp3.Request.Builder()
-//                        .url("https://api.iamport.kr/payments/find/" + merchantUid)
-//                        .header("Authorization", token)
-//                        .build();
-//                try (okhttp3.Response resp = client.newCall(request).execute()) {
-//                    String body = resp.body().string();
-//                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-//                    mapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-//                    com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(body);
-//                    if (node.get("code").asInt() == 0) {
-//                        return mapper.treeToValue(node.get("response"), Payment.class);
-//                    }
-//                }
-//            }
-//            throw e;
-//        }
-//        return null;
-//    }
 }
